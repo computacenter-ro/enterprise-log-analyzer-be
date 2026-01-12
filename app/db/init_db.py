@@ -16,10 +16,16 @@ async def init_db() -> None:
 
     try:
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+            # Use checkfirst=True to prevent errors if tables already exist
+            await conn.run_sync(Base.metadata.create_all, checkfirst=True)
         LOG.info("database initialized: ensured tables exist")
     except Exception as exc:
-        LOG.info("database initialization failed err=%s", exc)
-        raise
+        # Check if it's just a "already exists" error
+        if "already exists" in str(exc):
+            LOG.info("database initialization: tables already exist")
+        else:
+            LOG.info("database initialization failed err=%s", exc)
+            # Don't raise - allow the application to continue
+            pass
 
 

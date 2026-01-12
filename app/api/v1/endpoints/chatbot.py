@@ -29,6 +29,7 @@ def _get_provider() -> ChromaClientProvider:
 class ChatRequest(BaseModel):
     message: str
     conversation_history: List[Dict[str, str]] | None = None
+    context: Dict[str, Any] | None = None  # Environment context for scoped responses
 
 
 class ChatResponse(BaseModel):
@@ -572,6 +573,84 @@ Provide a helpful, concise answer based on the context above. If you can give sp
         return f"I found some relevant information but encountered an error generating a response. Please check the sources below."
 
 
+def _synthesize_context_response(user_query: str, context: Dict[str, Any]) -> str:
+    """Use LLM to answer questions based on provided environment context."""
+    env_data = context.get("environment", {})
+    
+    context_text = f"""Environment Information:
+- Name: {env_data.get('name', 'Unknown')}
+- Region: {env_data.get('region', 'Unknown')}
+- Status: {env_data.get('status', 'Unknown')}
+- Servers: {env_data.get('serverCount', 0)}
+- Applications: {env_data.get('applicationCount', 0)}
+- Switches: {env_data.get('switchCount', 0)}
+
+Telemetry:
+- CPU: {env_data.get('telemetry', {}).get('cpu', 'N/A')}%
+- Memory: {env_data.get('telemetry', {}).get('memory', 'N/A')}%
+- Disk I/O: {env_data.get('telemetry', {}).get('diskIO', 'N/A')}%
+- Network: {env_data.get('telemetry', {}).get('network', 'N/A')}
+
+Active Incidents:
+"""
+    incidents = env_data.get('incidents', [])
+    if incidents:
+        for inc in incidents:
+            context_text += f"- [{inc.get('severity', 'unknown').upper()}] {inc.get('title', 'Unknown')} (Service: {inc.get('service', 'Unknown')}, Confidence: {inc.get('confidence', 0)}%)\n"
+            if inc.get('details'):
+                context_text += f"  Details: {inc.get('details')}\n"
+    else:
+        context_text += "No active incidents.\n"
+    
+    critical_servers = env_data.get('criticalServers', [])
+    if critical_servers:
+        context_text += "\nCritical Servers:\n"
+        for srv in critical_servers:
+            context_text += f"- {srv.get('name', 'Unknown')}: CPU {srv.get('cpu', 'N/A')}%, Memory {srv.get('memory', 'N/A')}%\n"
+    
+    warning_servers = env_data.get('warningServers', [])
+    if warning_servers:
+        context_text += "\nWarning Servers:\n"
+        for srv in warning_servers:
+            context_text += f"- {srv.get('name', 'Unknown')}: CPU {srv.get('cpu', 'N/A')}%, Memory {srv.get('memory', 'N/A')}%\n"
+    
+    system_prompt = f"""You are an expert SRE assistant analyzing a specific environment. 
+Answer questions based ONLY on the provided environment context below.
+Be concise, technical, and helpful. Provide specific recommendations when possible.
+If asked about root cause, analyze the incidents and telemetry data to suggest likely causes.
+If asked about next steps, provide actionable remediation steps.
+
+Environment Context:
+{context_text}"""
+    
+    user_prompt = f"User Question: {user_query}\n\nProvide a helpful, specific answer based on the environment context above."
+    
+    try:
+        if settings.LLM_PROVIDER == "ollama":
+            client = _get_ollama()
+            resp = client.chat(
+                model=settings.OLLAMA_CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            return (resp or {}).get("message", {}).get("content", "I couldn't generate a response at this time.")
+        else:
+            client = _get_client()
+            response = client.chat.completions.create(
+                model=settings.OPENAI_CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            return response.choices[0].message.content or "I couldn't generate a response at this time."
+    except Exception as e:
+        LOG.error("Error synthesizing context response: %s", e)
+        return f"I encountered an error analyzing the environment. Please try again."
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
     """Chat endpoint that uses HyDE RAG over existing issues, alerts, and logs."""
@@ -581,6 +660,17 @@ async def chat(request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     
     LOG.info("Chat query: %s", user_query)
+    
+    # If context is provided, use context-aware response (for environment details page)
+    if request.context:
+        LOG.info("Using context-aware response for environment: %s", 
+                 request.context.get("environment", {}).get("name", "Unknown"))
+        response_text = _synthesize_context_response(user_query, request.context)
+        return ChatResponse(response=response_text, sources=[{
+            "type": "environment_context",
+            "name": request.context.get("environment", {}).get("name", "Unknown"),
+            "status": request.context.get("environment", {}).get("status", "Unknown"),
+        }])
     
     # LLM function calling to decide tool and generate query parameters
     tool_decision = _decide_tool(user_query) or {"action": "none"}

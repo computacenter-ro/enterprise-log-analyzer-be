@@ -161,6 +161,90 @@ class LogBERTEmbeddingFunction:
         return self([input])
 
 
+class LogBERTClientEmbeddingFunction:
+    """Client for external LogBERT embedding service.
+    
+    Connects to the LogBERT microservice which exposes an OpenAI-compatible
+    /v1/embeddings endpoint. This decouples the BERT model from the main
+    application, allowing for independent scaling and deployment.
+    """
+
+    _logged_ready_keys: set[str] = set()
+
+    def __init__(self, base_url: str, model_name: str = "bert-base-uncased") -> None:
+        """Initialize the LogBERT client.
+        
+        Args:
+            base_url: Base URL of the LogBERT service (e.g., http://logbert:8080)
+            model_name: Model name for identification (service uses its configured model)
+        """
+        self.base_url = base_url.rstrip("/")
+        self.model_name = model_name
+        logger = logging.getLogger(__name__)
+        
+        # Use OpenAI SDK to talk to the LogBERT service
+        self.client = OpenAI(
+            api_key="not-needed",  # LogBERT doesn't require auth
+            base_url=f"{self.base_url}/v1",
+        )
+        
+        # One-time readiness check
+        if base_url not in LogBERTClientEmbeddingFunction._logged_ready_keys:
+            try:
+                # Quick health check
+                import httpx
+                response = httpx.get(f"{self.base_url}/health", timeout=10.0)
+                if response.status_code == 200:
+                    health = response.json()
+                    logger.info(
+                        "logbert client ready url=%s model=%s dim=%s",
+                        base_url,
+                        health.get("model", "unknown"),
+                        health.get("embedding_dim", "unknown"),
+                    )
+                    LogBERTClientEmbeddingFunction._logged_ready_keys.add(base_url)
+            except Exception as e:
+                logger.warning("logbert service not reachable url=%s err=%s", base_url, e)
+
+    def __call__(self, input: Iterable[str]) -> List[List[float]]:
+        """Generate embeddings for input texts."""
+        texts = list(input)
+        if not texts:
+            return []
+
+        # Coerce all inputs to strings
+        clean_texts: List[str] = []
+        for value in texts:
+            if isinstance(value, str):
+                clean_texts.append(value)
+            elif isinstance(value, (list, tuple)):
+                try:
+                    clean_texts.append(" ".join(map(str, value)))
+                except Exception:
+                    clean_texts.append(str(value))
+            elif value is None:
+                clean_texts.append("")
+            else:
+                clean_texts.append(str(value))
+
+        # Call the LogBERT service
+        response = self.client.embeddings.create(
+            model=self.model_name,
+            input=clean_texts,
+        )
+        
+        return [emb.embedding for emb in response.data]
+
+    def name(self) -> str:
+        return f"logbert-client::{self.model_name}"
+
+    def embed_documents(self, input: Iterable[str]) -> List[List[float]]:
+        return self(list(input))
+
+    def embed_query(self, input: str) -> List[List[float]]:
+        return self([input])
+
+
 def embed_single_text(
     embedding_function: SentenceTransformerEmbeddingFunction, text: str
 ) -> List[List[float]]:
@@ -172,16 +256,37 @@ def embed_single_text(
 
 
 class OpenAIEmbeddingFunction:
-    """OpenAI embeddings adapter compatible with Chroma's embedding_function interface."""
+    """OpenAI embeddings adapter compatible with Chroma's embedding_function interface.
+    
+    This class also works with any OpenAI-compatible API, including:
+    - HuggingFace Text Embeddings Inference (TEI)
+    - vLLM
+    - LocalAI
+    - Any server exposing /v1/embeddings endpoint
+    """
 
-    def __init__(self, model: str, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        """Initialize the OpenAI-compatible embedding function.
+        
+        Args:
+            model: Model name for the embeddings
+            api_key: API key (optional for some servers like TEI)
+            base_url: Custom base URL for OpenAI-compatible servers (e.g., TEI at http://localhost:8081/v1)
+        """
         # OpenAI Python SDK v1 uses client with api_key from env or provided
         self.client = OpenAI(
-            api_key=api_key or settings.OPENAI_API_KEY,
-            organization=settings.OPENAI_ORG_ID,
-            project=settings.OPENAI_PROJECT,
+            api_key=api_key or settings.OPENAI_API_KEY or "not-needed",
+            organization=settings.OPENAI_ORG_ID if not base_url else None,
+            project=settings.OPENAI_PROJECT if not base_url else None,
+            base_url=base_url,
         )
         self.model = model
+        self._base_url = base_url
 
     def __call__(self, input: Iterable[str]) -> List[List[float]]:
         inputs = list(input)
@@ -193,6 +298,8 @@ class OpenAIEmbeddingFunction:
         return [emb.embedding for emb in response.data]
 
     def name(self) -> str:  # pragma: no cover - simple getter
+        if self._base_url:
+            return f"openai-compatible::{self.model}"
         return f"openai::{self.model}"
 
     # Chroma compatibility helpers

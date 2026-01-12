@@ -392,7 +392,8 @@ async def _ollama_chat_json(messages: List[Dict[str, str]], *, timeout: float = 
     payload = {
         "model": _OLLAMA_MODEL,
         "messages": messages,
-        "options": {"temperature": 0.2, "top_p": 0.95, "format": "json"},
+        "format": "json",
+        "options": {"temperature": 0.2, "top_p": 0.95},
         "stream": False,
     }
     try:

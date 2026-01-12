@@ -146,11 +146,16 @@ def assign_or_create_cluster(os_name: str, templated: str | object, *, threshold
 
 def _record_online_metrics(os_name: str, cluster_id: str, distance: float, is_new_cluster: bool) -> None:
     """Record online clustering metrics asynchronously."""
+    if not settings.ENABLE_CLUSTER_METRICS:
+        return
+        
+    # Use a simple approach without creating tasks to avoid "Task was destroyed" errors
     try:
         import redis.asyncio as aioredis
         from app.services.cluster_metrics import ClusterMetricsTracker
         
-        async def _record():
+        async def _record_sync(os_name: str, cluster_id: str, distance: float, is_new_cluster: bool) -> None:
+            """Synchronous version of metrics recording."""
             redis_client = None
             try:
                 redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -163,21 +168,38 @@ def _record_online_metrics(os_name: str, cluster_id: str, distance: float, is_ne
                     cluster_id,
                     exc,
                 )
+            except Exception as exc:
+                LOG.debug(
+                    "online clustering: metrics failed os=%s cluster=%s err=%s",
+                    os_name,
+                    cluster_id,
+                    exc,
+                )
             finally:
                 if redis_client is not None:
                     await redis_client.close()
         
-        # Run in new event loop if needed
+        # Create a new event loop just for this operation to avoid conflicts
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(_record())
-            else:
-                loop.run_until_complete(_record())
+            loop = asyncio.get_running_loop()
+            # If there's a running loop, use asyncio.run_coroutine_threadsafe
+            import threading
+            
+            def _run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                new_loop.run_until_complete(_record_sync(os_name, cluster_id, distance, is_new_cluster))
+                new_loop.close()
+            
+            thread = threading.Thread(target=_run_in_thread, daemon=True)
+            thread.start()
+            
         except RuntimeError:
-            asyncio.run(_record())
-    except Exception:
-        pass  # Don't fail clustering if metrics fail
+            # No running loop, create a new one
+            asyncio.run(_record_sync(os_name, cluster_id, distance, is_new_cluster))
+            
+    except Exception as exc:
+        LOG.debug("online clustering: metrics creation failed os=%s cluster=%s err=%s", os_name, cluster_id, exc)
 
 
 

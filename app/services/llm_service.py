@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any, Dict, List
 import logging
 import json
-import time
 
 from openai import OpenAI
 import ollama
@@ -42,7 +41,6 @@ def _chat_json_with_openai(system: str, user_prompt: str) -> Dict[str, Any]:
     Improved with simplified parsing and more robust error handling.
     """
     client = _get_client()
-    start_time = time.time()
     try:
         response = client.chat.completions.create(
             model=settings.OPENAI_CHAT_MODEL,
@@ -53,29 +51,11 @@ def _chat_json_with_openai(system: str, user_prompt: str) -> Dict[str, Any]:
             ]
         )
         content = response.choices[0].message.content or "{}"
-        result = json.loads(content)
-        
-        # Add timing and token metadata
-        latency_ms = (time.time() - start_time) * 1000
-        result["_llm_metadata"] = {
-            "latency_ms": latency_ms,
-            "tokens": response.usage.total_tokens if response.usage else 0,
-            "success": True,
-        }
-        return result
+        return json.loads(content)
     except Exception as e:
         # Fallback for API errors or other issues
         LOG.error("LLM(OpenAI) chat failed model=%s err=%s", settings.OPENAI_CHAT_MODEL, e)
-        latency_ms = (time.time() - start_time) * 1000
-        return {
-            "raw": str(e),
-            "error": "OpenAI API call failed.",
-            "_llm_metadata": {
-                "latency_ms": latency_ms,
-                "tokens": 0,
-                "success": False,
-            }
-        }
+        return {"raw": str(e), "error": "OpenAI API call failed."}
 
 
 def _chat_json_with_ollama(system: str, user_prompt: str, temperature: float) -> Dict[str, Any]:
@@ -89,7 +69,6 @@ def _chat_json_with_ollama(system: str, user_prompt: str, temperature: float) ->
         {"role": "user", "content": user_prompt},
     ]
     resp = None  # Initialize resp to prevent NameError in the except block
-    start_time = time.time()
     try:
         # Enforce JSON format directly in the API call for reliability
         resp = client.chat(
@@ -100,18 +79,7 @@ def _chat_json_with_ollama(system: str, user_prompt: str, temperature: float) ->
         )
         message = (resp or {}).get("message", {})
         text = message.get("content", "{}")
-        result = json.loads(text)
-        
-        # Add timing metadata (Ollama doesn't provide token counts by default)
-        latency_ms = (time.time() - start_time) * 1000
-        # Estimate tokens as ~4 chars per token
-        estimated_tokens = (len(system) + len(user_prompt) + len(text)) // 4
-        result["_llm_metadata"] = {
-            "latency_ms": latency_ms,
-            "tokens": estimated_tokens,
-            "success": True,
-        }
-        return result
+        return json.loads(text)
     except Exception as e:
         # Fallback is now safe from NameError
         text = ""
@@ -120,16 +88,7 @@ def _chat_json_with_ollama(system: str, user_prompt: str, temperature: float) ->
         else:
             text = str(e) # The error was likely in the API call itself
         LOG.error("LLM(Ollama) chat failed model=%s err=%s", settings.OLLAMA_CHAT_MODEL, e)
-        latency_ms = (time.time() - start_time) * 1000
-        return {
-            "raw": text,
-            "error": "Failed to get or parse Ollama response.",
-            "_llm_metadata": {
-                "latency_ms": latency_ms,
-                "tokens": 0,
-                "success": False,
-            }
-        }
+        return {"raw": text, "error": "Failed to get or parse Ollama response."}
 
 
 SYSTEM = "You are an SRE assistant. Respond ONLY with valid JSON."

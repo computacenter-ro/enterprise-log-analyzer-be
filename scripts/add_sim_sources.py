@@ -36,7 +36,7 @@ def _request(base_url: str, method: str, path: str, body: Dict[str, Any] | None 
 
 def _get_sources(base_url: str) -> List[Dict[str, Any]]:
     try:
-        res = _request(base_url, "GET", "/api/v1/sources/")
+        res = _request(base_url, "GET", "/api/v1/sources")
         if isinstance(res, list):
             return res
         return []
@@ -130,7 +130,7 @@ def create_sources(api_base: str, sim_base: str) -> None:
             skipped += 1
             continue
         try:
-            _request(api_base, "POST", "/api/v1/sources/", body=p)
+            _request(api_base, "POST", "/api/v1/sources", body=p)
             print(f"created: {name}")
             created += 1
         except urllib.error.HTTPError as e:
@@ -144,7 +144,7 @@ def create_sources(api_base: str, sim_base: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create simulator data sources in the backend app")
     parser.add_argument("--api-base", default=_env("API_BASE_URL", "http://localhost:8000"), help="Backend API base URL")
-    parser.add_argument("--sim-base", default=_env("SIM_BASE_URL", "http://localhost:8085"), help="Simulator base URL")
+    parser.add_argument("--sim-base", default=_env("SIM_BASE_URL", "http://localhost:8086"), help="Simulator base URL")
     args = parser.parse_args()
     create_sources(args.api_base, args.sim_base)
 

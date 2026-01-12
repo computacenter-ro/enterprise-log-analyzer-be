@@ -14,12 +14,12 @@ from app.streams.producer_manager import manager
 router = APIRouter()
 
 
-@router.get("/", response_model=list[DataSourceOut])
+@router.get("", response_model=list[DataSourceOut])
 async def list_sources(db: AsyncSession = Depends(get_db_session)) -> list[DataSourceOut]:
     return list(await crud_data_source.list(db))
 
 
-@router.post("/", response_model=DataSourceOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=DataSourceOut, status_code=status.HTTP_201_CREATED)
 async def create_source(
     *,
     db: AsyncSession = Depends(get_db_session),

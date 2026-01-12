@@ -27,6 +27,8 @@ configure_logging()
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_PREFIX}/openapi.json",
+    # Disable trailing slash redirects to avoid CORS issues with 307 redirects
+    redirect_slashes=False,
 )
 
 # Emit a startup breadcrumb to kaboom log to verify file logging works

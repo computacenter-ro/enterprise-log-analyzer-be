@@ -42,6 +42,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy application code
 COPY . /app
+# Copy simulation-api module for mock API
+COPY ./simulation-api /app/simulation-api
 
 ###############################################
 # Runtime image                                #
@@ -70,7 +72,7 @@ RUN apt-get update \
 
 # Defaults for built-in mock API (accessible via localhost inside the container)
 ENV MOCK_HOST="127.0.0.1" \
-    MOCK_PORT="8085"
+    MOCK_PORT="8086"
 
 # Workdir inside runtime image
 WORKDIR /app
@@ -79,6 +81,12 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
+
+# Add app directory to Python path for producer
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Add simulation-api to Python path for producer
+ENV PYTHONPATH="/app/simulation-api:${PYTHONPATH}"
 
 # Copy project source
 COPY --from=builder /app /app

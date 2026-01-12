@@ -6,10 +6,10 @@ APP_MODULE="${APP_MODULE:-app.main:app}"
 APP_HOST="${HOST:-0.0.0.0}"
 APP_PORT="${PORT:-8000}"
 MOCK_HOST="${MOCK_HOST:-127.0.0.1}"
-MOCK_PORT="${MOCK_PORT:-8085}"
+MOCK_PORT="${MOCK_PORT:-8086}"
 
 echo "Starting main API: ${APP_MODULE} on ${APP_HOST}:${APP_PORT}"
-uvicorn "${APP_MODULE}" --host "${APP_HOST}" --port "${APP_PORT}" --workers 2 &
+uvicorn "${APP_MODULE}" --host "${APP_HOST}" --port "${APP_PORT}" --workers 1 &
 MAIN_PID=$!
 
 echo "Starting mock API on ${MOCK_HOST}:${MOCK_PORT}"

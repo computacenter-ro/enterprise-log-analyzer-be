@@ -47,6 +47,9 @@ def _proto_collection_name(os_name: str) -> str:
 
 
 def _vector_has_values(vec) -> bool:
+    """Check if vector has values without triggering numpy truthiness ambiguity."""
+    if vec is None:
+        return False
     try:
         import numpy as np  # type: ignore
         if isinstance(vec, np.ndarray):  # noqa: SIM401
@@ -54,6 +57,9 @@ def _vector_has_values(vec) -> bool:
     except Exception:
         pass
     try:
+        # Convert to list to avoid numpy array truthiness issues
+        if hasattr(vec, 'tolist'):
+            vec = vec.tolist()
         return bool(len(vec) > 0)  # type: ignore[arg-type]
     except Exception:
         return False
@@ -106,19 +112,26 @@ async def run_cluster_enricher() -> None:
                     except Exception:
                         pass
                     if _vector_has_values(centroid_vec):
-                        tcoll = _get_provider().get_or_create_collection(collection_name_for_os(os_name))
-                        q = tcoll.query(query_embeddings=[centroid_vec], n_results=8, include=["documents", "metadatas", "distances"]) or {}
-                        ids = (q.get("ids") or [[]])[0]
-                        docs = (q.get("documents") or [[]])[0]
-                        dists = (q.get("distances") or [[]])[0]
-                        metas = (q.get("metadatas") or [[]])[0]
-                        for i in range(len(ids)):
-                            neighbors.append({
-                                "id": ids[i],
-                                "document": docs[i] if i < len(docs) else "",
-                                "distance": dists[i] if i < len(dists) else None,
-                                "metadata": metas[i] if i < len(metas) else {},
-                            })
+                        try:
+                            tcoll = _get_provider().get_or_create_collection(collection_name_for_os(os_name))
+                            q = tcoll.query(query_embeddings=[centroid_vec], n_results=8, include=["documents", "metadatas", "distances"]) or {}
+                            ids = (q.get("ids") or [[]])[0]
+                            docs = (q.get("documents") or [[]])[0]
+                            dists = (q.get("distances") or [[]])[0]
+                            metas = (q.get("metadatas") or [[]])[0]
+                            for i in range(len(ids)):
+                                neighbors.append({
+                                    "id": ids[i],
+                                    "document": docs[i] if i < len(docs) else "",
+                                    "distance": dists[i] if i < len(dists) else None,
+                                    "metadata": metas[i] if i < len(metas) else {},
+                                })
+                        except Exception as e:
+                            # Handle ChromaDB HNSW index errors gracefully
+                            if "Nothing found on disk" in str(e) or "hnsw segment reader" in str(e):
+                                LOG.info("cluster enricher: template collection index corrupted, skipping neighbor lookup id=%s os=%s err=%s", cluster_id, os_name, e)
+                            else:
+                                raise
 
                     # HYDE queries using medoid (kept for future use), but retrieval will not use query()
                     seed_logs = [{"templated": medoid_doc}] if medoid_doc else []

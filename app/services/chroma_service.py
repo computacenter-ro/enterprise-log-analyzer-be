@@ -14,6 +14,7 @@ from app.services.embedding import (
     OpenAIEmbeddingFunction,
     OllamaEmbeddingFunction,
     LogBERTEmbeddingFunction,
+    LogBERTClientEmbeddingFunction,
 )
 
 
@@ -38,14 +39,33 @@ class ChromaClientProvider:
                 model=settings.OLLAMA_EMBEDDING_MODEL,
             )
         elif provider == "logbert":
-            self.embedding_fn = LogBERTEmbeddingFunction(
-                model_name=settings.LOGBERT_MODEL_NAME,
-                device=settings.LOGBERT_DEVICE,
+            # Check if external LogBERT service is configured
+            if settings.LOGBERT_BASE_URL:
+                # Use external LogBERT microservice (OpenAI-compatible API)
+                logbert_base = settings.LOGBERT_BASE_URL.rstrip("/")
+                self.embedding_fn = LogBERTClientEmbeddingFunction(
+                    base_url=logbert_base,
+                    model_name=settings.LOGBERT_MODEL_NAME,
+                )
+            else:
+                # Use local LogBERT (loads model in-process)
+                self.embedding_fn = LogBERTEmbeddingFunction(
+                    model_name=settings.LOGBERT_MODEL_NAME,
+                    device=settings.LOGBERT_DEVICE,
+                )
+        elif provider == "tei":
+            # Text Embeddings Inference - HuggingFace's high-performance embedding server
+            # Reuses OpenAIEmbeddingFunction since TEI exposes OpenAI-compatible /v1/embeddings
+            tei_base = settings.TEI_BASE_URL.rstrip("/")
+            self.embedding_fn = OpenAIEmbeddingFunction(
+                model=settings.TEI_MODEL_NAME,
+                api_key=settings.TEI_API_KEY,
+                base_url=f"{tei_base}/v1",
             )
         else:
             raise ValueError(
                 f"Unknown EMBEDDING_PROVIDER '{settings.EMBEDDING_PROVIDER}'. "
-                "Supported: openai, sentence-transformers, ollama, logbert"
+                "Supported: openai, sentence-transformers, ollama, logbert, tei"
             )
         self._client = self._create_client()
 

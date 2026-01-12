@@ -10,7 +10,7 @@ from app.schemas.item import Item, ItemCreate, ItemUpdate
 router = APIRouter()
 
 
-@router.get("/", response_model=list[Item])
+@router.get("", response_model=list[Item])
 async def read_items(
     skip: int = 0,
     limit: int = 100,
@@ -20,7 +20,7 @@ async def read_items(
     return await crud_item.get_multi(db, skip=skip, limit=limit)
 
 
-@router.post("/", response_model=Item, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Item, status_code=status.HTTP_201_CREATED)
 async def create_item(*, db: AsyncSession = Depends(get_db_session), item_in: ItemCreate) -> Item:
     """Create new item."""
     return await crud_item.create(db, obj_in=item_in)
