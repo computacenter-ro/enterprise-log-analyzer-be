@@ -1,0 +1,20 @@
+name: Setup Cloudflare Tunnel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-tunnel:
+    uses: computacenter-ro/github-workflows-docker/.github/workflows/cloudflare-tunnel-setup.yml@main
+    with:
+      runs-on: '["self-hosted", "ccro-macstudio-one"]'
+      compose-file: 'docker-compose.mac.yml'
+
+      # Define which services to expose
+      services: |
+        [
+          {"name": "log-analyzer-backend", "subdomain": "log-analyzer-api", "internal_port": 8000, "expose": true}
+        ]
+
+      domain: 'ccrolabs.com'
+    secrets: inherit
