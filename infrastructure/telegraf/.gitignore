@@ -1,0 +1,23 @@
+# =============================================================================
+# Telegraf .gitignore
+# =============================================================================
+
+# Environment files with secrets
+telegraf.env
+*.env
+!*.env.example
+
+# Local configuration overrides
+telegraf.local.conf
+*.local.conf
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# macOS
+.DS_Store
