@@ -98,11 +98,11 @@ def compute_global_clusters(
         except Exception as exc:
             LOG.info("correlation: failed to read logs for os=%s err=%s", os_name, exc)
             data = {}
-        os_ids: List[str] = list(data.get("ids", []))
-        os_docs: List[str] = list(data.get("documents", []))
-        os_embs: List[List[float]] = list(data.get("embeddings", []))
-        os_metas_raw = data.get("metadatas", []) or []
-        os_metas: List[Dict[str, Any]] = [m or {} for m in os_metas_raw]
+        os_ids: List[str] = list(data.get("ids") or [])
+        os_docs: List[str] = list(data.get("documents") or [])
+        os_embs: List[List[float]] = [list(e) for e in (data.get("embeddings") or [])]
+        os_metas_raw = data.get("metadatas") or []
+        os_metas: List[Dict[str, Any]] = [dict(m) if m else {} for m in os_metas_raw]
 
         # Group by source and take up to limit_per_source
         by_source: Dict[str, List[int]] = {}
@@ -242,11 +242,11 @@ def compute_global_prototype_clusters_hdbscan(
         except Exception as exc:
             LOG.info("hdbscan correlation: failed to read prototypes for os=%s err=%s", os_name, exc)
             data = {}
-        ids0: List[str] = list(data.get("ids", []))
-        docs0: List[str] = list(data.get("documents", []))
-        embs0: List[List[float]] = list(data.get("embeddings", []))
-        metas_raw = data.get("metadatas", []) or []
-        metas0: List[Dict[str, Any]] = [m or {} for m in metas_raw]
+        ids0: List[str] = list(data.get("ids") or [])
+        docs0: List[str] = list(data.get("documents") or [])
+        embs0: List[List[float]] = [list(e) for e in (data.get("embeddings") or [])]
+        metas_raw = data.get("metadatas") or []
+        metas0: List[Dict[str, Any]] = [dict(m) if m else {} for m in metas_raw]
         # Annotate os if missing
         for i in range(len(ids0)):
             meta = dict(metas0[i] or {})
@@ -360,9 +360,9 @@ def compute_global_prototype_clusters_hdbscan(
             except Exception as exc:
                 LOG.info("hdbscan correlation: logs query failed os=%s proto=%s err=%s", osn, proto_id, exc)
                 q = {}
-            ids1 = list(q.get("ids", []))
-            docs1 = list(q.get("documents", []))
-            metas1 = list(q.get("metadatas", []))
+            ids1 = list(q.get("ids") or [])
+            docs1 = list(q.get("documents") or [])
+            metas1 = list(q.get("metadatas") or [])
             for j in range(len(ids1)):
                 if len(samples) >= include_logs_per_cluster:
                     break

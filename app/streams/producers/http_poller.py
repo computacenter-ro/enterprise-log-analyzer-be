@@ -32,7 +32,7 @@ class DCIMHttpPoller(ProducerPlugin):
         self.interval: float = float(config.get("poll_interval_sec", 30))
         self.verify_ssl: bool = bool(config.get("verify_ssl", True))
         self._stop = False
-        self._source_id: int | None = int(config.get("_source_id")) if config.get("_source_id") is not None else None
+        self._source_id: int | None = int(config.get("_source_id") or 0) if config.get("_source_id") is not None else None
 
     async def _poll_endpoint(self, ep: dict[str, Any]) -> None:
         url: str = str(ep.get("url") or "")

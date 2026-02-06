@@ -53,8 +53,11 @@ async def aggregate_cluster_stats(os_name: str) -> Dict[str, Any]:
         
         # Aggregate stats
         total_clusters = len(metas)
-        sizes = [m.get("size", 1) for m in metas]
-        labeled = sum(1 for m in metas if m.get("label") and m.get("label") != "unknown")
+        sizes: list[int] = []
+        for m in metas:
+            size_val = m.get("size") if m else None
+            sizes.append(int(size_val) if isinstance(size_val, (int, float)) else 1)
+        labeled = sum(1 for m in metas if m and m.get("label") and m.get("label") != "unknown")
         
         avg_size = sum(sizes) / len(sizes) if sizes else 0
         max_size = max(sizes) if sizes else 0
@@ -63,7 +66,7 @@ async def aggregate_cluster_stats(os_name: str) -> Dict[str, Any]:
         # Count by label
         label_counts: Dict[str, int] = {}
         for m in metas:
-            label = m.get("label", "unknown")
+            label = str(m.get("label") or "unknown") if m else "unknown"
             label_counts[label] = label_counts.get(label, 0) + 1
         
         return {
@@ -83,7 +86,7 @@ async def aggregate_cluster_stats(os_name: str) -> Dict[str, Any]:
 
 async def check_quality_alerts(os_name: str, tracker: ClusterMetricsTracker) -> List[Dict[str, Any]]:
     """Check if quality metrics are below thresholds and generate alerts."""
-    alerts = []
+    alerts: List[Dict[str, Any]] = []
     
     try:
         # Get latest quality metrics
@@ -115,7 +118,7 @@ async def check_quality_alerts(os_name: str, tracker: ClusterMetricsTracker) -> 
 
 async def check_drift_alerts(os_name: str, tracker: ClusterMetricsTracker) -> List[Dict[str, Any]]:
     """Check for drift indicators and generate alerts."""
-    alerts = []
+    alerts: List[Dict[str, Any]] = []
     
     try:
         # Get online metrics for drift detection window
@@ -179,7 +182,7 @@ async def run_metrics_aggregation():
                     all_alerts = quality_alerts + drift_alerts
                     for alert in all_alerts:
                         try:
-                            await redis.xadd(settings.ALERTS_STREAM, alert)
+                            await redis.xadd(settings.ALERTS_STREAM, alert)  # type: ignore[arg-type]
                             LOG.warning(
                                 "cluster metric alert type=%s os=%s message=%s",
                                 alert.get("type"),

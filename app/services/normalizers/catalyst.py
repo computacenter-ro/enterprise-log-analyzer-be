@@ -16,6 +16,8 @@ def normalize_catalyst(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> 
         domain = t.split("_", 1)[1]
         # Health responses may include a healthScore or similar 0-100
         score = payload.get("healthScore") or payload.get("score") or payload.get("networkHealthAverage")
+        if score is None:
+            return out
         try:
             val = float(score)
         except Exception:

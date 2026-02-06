@@ -71,9 +71,9 @@ def _get_prototype(os_name: str, cluster_id: str) -> tuple[list[float] | None, s
     embs = data.get("embeddings") or []
     docs = data.get("documents") or []
     metas = data.get("metadatas") or []
-    centroid = embs[0] if embs else None
-    medoid_doc = docs[0] if docs else ""
-    meta = metas[0] if metas else {}
+    centroid: list[float] | None = list(embs[0]) if embs else None
+    medoid_doc: str = str(docs[0]) if docs else ""
+    meta: Dict[str, Any] = dict(metas[0]) if metas else {}
     return centroid, medoid_doc, meta
 
 
@@ -104,14 +104,17 @@ async def run_cluster_enricher() -> None:
                     # neighbors from templates via centroid
                     neighbors: List[Dict[str, Any]] = []
                     # Avoid numpy truthiness ambiguity on arrays by coercing to list and checking size explicitly
-                    centroid_vec = centroid
-                    try:
-                        import numpy as np  # type: ignore
-                        if isinstance(centroid_vec, np.ndarray):  # noqa: SIM401
-                            centroid_vec = centroid_vec.tolist()
-                    except Exception:
-                        pass
-                    if _vector_has_values(centroid_vec):
+                    centroid_vec: list[float] | None = None
+                    if centroid is not None:
+                        try:
+                            import numpy as np  # type: ignore
+                            if isinstance(centroid, np.ndarray):
+                                centroid_vec = centroid.tolist()
+                            else:
+                                centroid_vec = list(centroid)
+                        except Exception:
+                            centroid_vec = list(centroid) if centroid else None
+                    if centroid_vec and len(centroid_vec) > 0:
                         try:
                             tcoll = _get_provider().get_or_create_collection(collection_name_for_os(os_name))
                             q = tcoll.query(query_embeddings=[centroid_vec], n_results=8, include=["documents", "metadatas", "distances"]) or {}
@@ -144,9 +147,9 @@ async def run_cluster_enricher() -> None:
                         res = lcoll.get(where={"cluster_id": cluster_id}, include=["documents", "metadatas"], limit=30) or {}
                     except Exception:
                         res = {}
-                    ids = list(res.get("ids", []))
-                    docs = list(res.get("documents", []))
-                    metas = list(res.get("metadatas", []))
+                    ids = list(res.get("ids") or [])
+                    docs = list(res.get("documents") or [])
+                    metas = list(res.get("metadatas") or [])
                     for i in range(len(ids)):
                         retrieved.append({
                             "id": ids[i],
@@ -174,7 +177,7 @@ async def run_cluster_enricher() -> None:
                         except Exception:
                             pass  # Don't fail enrichment if metrics fail
                     
-                    payload = {
+                    payload: Dict[str, str] = {
                         "type": "cluster",
                         "os": os_name,
                         "cluster_id": cluster_id,
@@ -182,7 +185,7 @@ async def run_cluster_enricher() -> None:
                         "confidence": str(result.get("confidence") or ""),
                         "result": json.dumps(result),
                     }
-                    entry_id = await redis.xadd(settings.ALERTS_STREAM, payload)
+                    entry_id = await redis.xadd(settings.ALERTS_STREAM, payload)  # type: ignore[arg-type]
                     try:
                         import logging as _logging
                         _logging.getLogger("app.kaboom").info(

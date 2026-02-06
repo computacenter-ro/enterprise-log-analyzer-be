@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import json
 import logging
 from fastapi import APIRouter, HTTPException
@@ -114,6 +114,7 @@ def _decide_tool(user_query: str) -> Dict[str, Any]:
       {"action": "search_alerts", "params": {"severity": "critical", "limit": 3, "order": "desc"}}
     or {"action": "none"}
     """
+    default_result: Dict[str, Any] = {"action": "none"}
     system = """You are a function-calling agent for an SRE chatbot. 
 Analyze the user query and generate precise database query parameters.
 Always respond with valid JSON only, no other text."""
@@ -172,10 +173,11 @@ Analyze and return JSON:
                 ],
             )
             content = response.choices[0].message.content or "{}"
-            return json.loads(content)
+            parsed = json.loads(content)
+            return parsed if isinstance(parsed, dict) else default_result
     except Exception as e:
         LOG.debug("intent decide failed err=%s", e)
-        return {"action": "none"}
+        return default_result
 
 
 async def _tool_search_alerts(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -377,7 +379,7 @@ async def _search_alerts(queries: List[str], limit: int = 10) -> List[Dict[str, 
                     # Check individual words
                     for word in query_lower.split():
                         if len(word) > 3 and word in searchable:
-                            relevance += 0.5
+                            relevance += 1
                 
                 if relevance > 0:
                     alerts.append({
@@ -426,7 +428,7 @@ async def _search_incidents(queries: List[str], limit: int = 10) -> List[Dict[st
                         relevance += 1
                     for word in query_lower.split():
                         if len(word) > 3 and word in searchable:
-                            relevance += 0.5
+                            relevance += 1
                 
                 if relevance > 0:
                     incidents.append({
@@ -448,7 +450,7 @@ async def _search_incidents(queries: List[str], limit: int = 10) -> List[Dict[st
         return []
 
 
-def _search_vector_db(queries: List[str], os_list: List[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+def _search_vector_db(queries: List[str], os_list: Optional[List[str]] = None, limit: int = 10) -> List[Dict[str, Any]]:
     """Search ChromaDB vector store for relevant logs using HyDE queries."""
     results = []
     

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 import secrets
 import uuid
@@ -15,7 +17,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[DataSourceOut])
-async def list_sources(db: AsyncSession = Depends(get_db_session)) -> list[DataSourceOut]:
+async def list_sources(db: AsyncSession = Depends(get_db_session)) -> Any:
     return list(await crud_data_source.list(db))
 
 
@@ -24,7 +26,7 @@ async def create_source(
     *,
     db: AsyncSession = Depends(get_db_session),
     body: DataSourceCreate,
-) -> DataSourceOut:
+) -> Any:
     one_time_token: str | None = None
     one_time_agent_id: str | None = None
     # Auto-generate token/agent_id for telegraf if missing
@@ -61,7 +63,7 @@ async def update_source(
     db: AsyncSession = Depends(get_db_session),
     source_id: int,
     body: DataSourceUpdate,
-) -> DataSourceOut:
+) -> Any:
     exists = await crud_data_source.get(db, source_id)
     if exists is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Data source not found")

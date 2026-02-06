@@ -49,7 +49,7 @@ def normalize_redfish(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> L
                 if val is None:
                     continue
                 unit = str(f.get("ReadingUnits") or "RPM")
-                mp: MetricPoint = {
+                mp_fan: MetricPoint = {
                     "name": "redfish.fan.speed",
                     "type": "gauge",
                     "value": val,
@@ -58,7 +58,7 @@ def normalize_redfish(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> L
                     "resource": {"host": host, "vendor": "redfish"},
                     "attributes": {"name": f.get("Name"), "member_id": f.get("MemberId")},
                 }
-                out.append(mp)
+                out.append(mp_fan)
 
     if kind == "power" and isinstance(body, dict):
         # Power consumed watts
@@ -69,7 +69,7 @@ def normalize_redfish(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> L
                     continue
                 val = _num(p.get("PowerConsumedWatts"))
                 if val is not None:
-                    mp: MetricPoint = {
+                    mp_power: MetricPoint = {
                         "name": "redfish.power.consumed_watts",
                         "type": "gauge",
                         "value": val,
@@ -78,7 +78,7 @@ def normalize_redfish(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> L
                         "resource": {"host": host, "vendor": "redfish"},
                         "attributes": {},
                     }
-                    out.append(mp)
+                    out.append(mp_power)
         # Voltages
         volts = body.get("Voltages") or []
         if isinstance(volts, list):
@@ -88,7 +88,7 @@ def normalize_redfish(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> L
                 val = _num(v.get("ReadingVolts"))
                 if val is None:
                     continue
-                mp: MetricPoint = {
+                mp_volt: MetricPoint = {
                     "name": "redfish.voltage.volts",
                     "type": "gauge",
                     "value": val,
@@ -97,7 +97,7 @@ def normalize_redfish(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> L
                     "resource": {"host": host, "vendor": "redfish"},
                     "attributes": {"name": v.get("Name"), "member_id": v.get("MemberId")},
                 }
-                out.append(mp)
+                out.append(mp_volt)
 
     return out
 

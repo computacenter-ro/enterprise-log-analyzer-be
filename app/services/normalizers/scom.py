@@ -22,6 +22,8 @@ def normalize_scom(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> List
         counter = str(payload.get("CounterName") or payload.get("counter") or "").lower()
         inst = str(payload.get("InstanceName") or payload.get("instance") or "")
         val = payload.get("Value") if "Value" in payload else payload.get("value")
+        if val is None:
+            return []
         try:
             num = float(val)
         except Exception:

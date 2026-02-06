@@ -55,7 +55,7 @@ class BlueCatProducer(ProducerPlugin):
                         body = resp.json()
                     except Exception:
                         body = []
-                    items = []
+                    items: list[Any] = []
                     if isinstance(body, dict) and "items" in body:
                         items = body.get("items") or []
                     elif isinstance(body, list):

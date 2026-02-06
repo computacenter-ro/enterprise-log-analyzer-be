@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import logging
 
-import aiofiles
+import aiofiles  # type: ignore[import-untyped]
 
 from app.streams.producers.base import ProducerPlugin
 from app.streams.producers.registry import register

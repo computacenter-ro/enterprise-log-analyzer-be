@@ -151,8 +151,9 @@ async def consume_logs():
                                 points = []
                             if points:
                                 LOG.info("consumer: normalized metrics kind=%s points=%d", kind, len(points))
-                                # Export to OTEL if enabled
-                                export_metrics(points)
+                                # Export to OTEL if enabled (cast to satisfy type checker)
+                                from typing import cast, Sequence
+                                export_metrics(cast(Sequence[Dict[str, Any]], points))
                                 # Also write to Redis metrics stream for internal uses
                                 for mp in points:
                                     try:
@@ -168,8 +169,8 @@ async def consume_logs():
                                     except Exception:
                                         pass
                                 # Derive incident candidates from normalized telemetry (network-aware)
+                                norm_candidates: List[Dict[str, Any]] = []
                                 try:
-                                    norm_candidates: List[Dict[str, Any]] = []
                                     # ThousandEyes candidates
                                     if kind == "thousandeyes":
                                         typ = str(payload_obj.get("type") or "")

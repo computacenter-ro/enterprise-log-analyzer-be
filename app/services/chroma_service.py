@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -24,17 +24,18 @@ class ChromaClientProvider:
     def __init__(self, embedding_model_name: Optional[str] = None) -> None:
         # Choose embedding provider
         provider = settings.EMBEDDING_PROVIDER.lower()
+        embedding_fn: Any = None
         if provider == "openai":
-            self.embedding_fn = OpenAIEmbeddingFunction(
+            embedding_fn = OpenAIEmbeddingFunction(
                 model=settings.OPENAI_EMBEDDING_MODEL,
                 api_key=settings.OPENAI_API_KEY,
             )
         elif provider == "sentence-transformers":
-            self.embedding_fn = SentenceTransformerEmbeddingFunction(
+            embedding_fn = SentenceTransformerEmbeddingFunction(
                 embedding_model_name or settings.EMBEDDING_MODEL_NAME
             )
         elif provider == "ollama":
-            self.embedding_fn = OllamaEmbeddingFunction(
+            embedding_fn = OllamaEmbeddingFunction(
                 base_url=settings.OLLAMA_BASE_URL,
                 model=settings.OLLAMA_EMBEDDING_MODEL,
             )
@@ -43,13 +44,13 @@ class ChromaClientProvider:
             if settings.LOGBERT_BASE_URL:
                 # Use external LogBERT microservice (OpenAI-compatible API)
                 logbert_base = settings.LOGBERT_BASE_URL.rstrip("/")
-                self.embedding_fn = LogBERTClientEmbeddingFunction(
+                embedding_fn = LogBERTClientEmbeddingFunction(
                     base_url=logbert_base,
                     model_name=settings.LOGBERT_MODEL_NAME,
                 )
             else:
                 # Use local LogBERT (loads model in-process)
-                self.embedding_fn = LogBERTEmbeddingFunction(
+                embedding_fn = LogBERTEmbeddingFunction(
                     model_name=settings.LOGBERT_MODEL_NAME,
                     device=settings.LOGBERT_DEVICE,
                 )
@@ -57,7 +58,7 @@ class ChromaClientProvider:
             # Text Embeddings Inference - HuggingFace's high-performance embedding server
             # Reuses OpenAIEmbeddingFunction since TEI exposes OpenAI-compatible /v1/embeddings
             tei_base = settings.TEI_BASE_URL.rstrip("/")
-            self.embedding_fn = OpenAIEmbeddingFunction(
+            embedding_fn = OpenAIEmbeddingFunction(
                 model=settings.TEI_MODEL_NAME,
                 api_key=settings.TEI_API_KEY,
                 base_url=f"{tei_base}/v1",
@@ -67,6 +68,7 @@ class ChromaClientProvider:
                 f"Unknown EMBEDDING_PROVIDER '{settings.EMBEDDING_PROVIDER}'. "
                 "Supported: openai, sentence-transformers, ollama, logbert, tei"
             )
+        self.embedding_fn = embedding_fn
         self._client = self._create_client()
 
     def _create_client(self) -> ClientAPI:

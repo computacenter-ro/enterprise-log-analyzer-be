@@ -29,7 +29,7 @@ class DellOMELogs(ProducerPlugin):
         # Optional: devices discovery via a pasted OME link to list devices (e.g. /api/DeviceService/Devices?$filter=...)
         self.devices_url: str | None = str(config.get("devices_url") or "") or None
         self.discovery_interval: float = float(config.get("discovery_interval_sec", 300))
-        self._source_id: Optional[int] = int(config.get("_source_id")) if config.get("_source_id") is not None else None
+        self._source_id: Optional[int] = int(config.get("_source_id") or 0) if config.get("_source_id") is not None else None
         self._stop = False
         self._last_time: Dict[int, str] = {}
         self._tasks: Dict[int, asyncio.Task] = {}

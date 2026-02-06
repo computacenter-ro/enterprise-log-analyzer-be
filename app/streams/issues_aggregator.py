@@ -103,14 +103,14 @@ async def _close_and_publish(issue: Issue) -> None:
         }
         for log in issue.top_logs(settings.ISSUE_MAX_LOGS_FOR_LLM)
     ]
-    payload = {
+    payload: Dict[str, str] = {
         "os": issue.os,
         "issue_key": issue.key,
         # send compact representation: concatenate templated as a rough summary
         "templated_summary": " \n".join([log["templated"] for log in issue.top_logs(settings.ISSUE_MAX_LOGS_FOR_LLM)]),
         "logs": __import__("json").dumps(logs_list),
     }
-    await redis.xadd(settings.ISSUES_CANDIDATES_STREAM, payload)
+    await redis.xadd(settings.ISSUES_CANDIDATES_STREAM, payload)  # type: ignore[arg-type]
     LOG.info("published issue os=%s key=%s logs=%d", issue.os, issue.key, len(issue.logs))
 
 
@@ -159,7 +159,8 @@ async def run_issues_aggregator() -> None:
                         coll_name = f"{settings.CHROMA_LOG_COLLECTION_PREFIX}{os_name}"
                         collection = _get_provider().get_or_create_collection(coll_name)
                         current = collection.get(ids=[msg_id], include=["metadatas"]) or {}
-                        metas = (current.get("metadatas") or [[]])[0] or {}
+                        metas_list = current.get("metadatas") or []
+                        metas: dict = dict(metas_list[0]) if metas_list else {}
                         metas["cluster_id"] = cluster_id
                         collection.update(ids=[msg_id], metadatas=[metas])
                     except Exception:

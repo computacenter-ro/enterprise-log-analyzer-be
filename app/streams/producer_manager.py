@@ -4,6 +4,7 @@ import asyncio
 import logging
 import threading
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from sqlalchemy import select
@@ -11,6 +12,9 @@ from sqlalchemy import select
 from app.db.session import AsyncSessionLocal
 from app.models.data_source import DataSource
 from app.streams.producers.registry import get_factory
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 # Ensure built-in producers are imported so they register
 from app.streams.producers import filetail as _filetail  # noqa: F401
@@ -60,12 +64,13 @@ class ProducerManager:
         if self.loop is not None:
             return
         self.loop = asyncio.new_event_loop()
+        loop = self.loop  # Local reference for the closure
 
         def _runner() -> None:
-            asyncio.set_event_loop(self.loop)
+            asyncio.set_event_loop(loop)
             # Start heartbeat task in the producers loop
-            self.loop.create_task(self._heartbeat())
-            self.loop.run_forever()
+            loop.create_task(self._heartbeat())
+            loop.run_forever()
 
         self.thread = threading.Thread(target=_runner, name="producers-thread", daemon=True)
         self.thread.start()
@@ -112,6 +117,9 @@ class ProducerManager:
         cfg["_source_id"] = source_id
         cfg["_type"] = type_
         instance = factory(cfg)
+        if self.loop is None:
+            LOG.warning("Cannot start producer id=%s: event loop not initialized", source_id)
+            return
         task = self.loop.create_task(self._run_with_restart(source_id, instance))  # type: ignore[arg-type]
         self.instances[source_id] = instance
         self.tasks[source_id] = task
@@ -128,7 +136,8 @@ class ProducerManager:
         LOG.info("stopped producer id=%s", source_id)
 
     async def reconcile_all(self) -> None:
-        async with AsyncSessionLocal() as db:  # type: AsyncSession
+        db: AsyncSession
+        async with AsyncSessionLocal() as db:
             rows = (
                 await db.execute(select(DataSource).where(DataSource.enabled == True))  # noqa: E712
             ).scalars().all()

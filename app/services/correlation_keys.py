@@ -68,7 +68,7 @@ def compute_key_correlation(keys: List[str], limit: int = 2000) -> Dict[str, Any
     events: List[Dict[str, Any]] = []
     for os_name in ("linux", "macos", "windows"):
         coll = provider.get_or_create_collection(_logs_collection_name(os_name))
-        data = coll.get(include=["documents", "metadatas", "ids"], limit=int(limit)) or {}
+        data = coll.get(include=["documents", "metadatas"], limit=int(limit)) or {}
         ids = data.get("ids") or []
         docs = data.get("documents") or []
         metas = data.get("metadatas") or []

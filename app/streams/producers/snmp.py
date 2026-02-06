@@ -39,7 +39,7 @@ class SNMPProducer(ProducerPlugin):
         self.interval: float = float(config.get("poll_interval_sec", 30))
         self.timeout: float = float(config.get("timeout_sec", 3))
         self._stop = False
-        self._source_id: int | None = int(config.get("_source_id")) if config.get("_source_id") is not None else None
+        self._source_id: int | None = int(config.get("_source_id") or 0) if config.get("_source_id") is not None else None
         self._snmp = _import_puresnmp()
 
     async def _get_oid(self, client: Any, oid: str) -> Any:

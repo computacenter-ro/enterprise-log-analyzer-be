@@ -131,7 +131,7 @@ def _medoid_index(indices: List[int], vectors: List[List[float]], centroid: List
 def _label_cluster(documents: List[str]) -> Tuple[str, str]:
     # Try medoid document first, fallback to majority over all docs
     signals = [match_failure_signals(doc) for doc in documents]
-    labels = [s.get("label") for s in signals if s.get("has_signal")]
+    labels = [str(s.get("label")) for s in signals if s.get("has_signal") and s.get("label")]
     if labels:
         # majority vote
         counts: Dict[str, int] = {}
@@ -190,7 +190,14 @@ def upsert_prototypes(os_name: str, provider: ChromaClientProvider, prototypes: 
     ]
     embeddings = [p.centroid for p in prototypes]
     try:
-        collection.upsert(ids=ids, documents=docs, embeddings=embeddings, metadatas=metas)
+        from typing import cast, List as TypingList
+        from chromadb.api.types import Embedding, Metadata
+        collection.upsert(
+            ids=ids,
+            documents=docs,
+            embeddings=cast(TypingList[Embedding], embeddings),
+            metadatas=cast(TypingList[Metadata], metas),
+        )
     except Exception:
         # Print full stack with brief context to aid debugging
         dim = len(embeddings[0]) if embeddings and embeddings[0] else 0
@@ -219,22 +226,22 @@ def cluster_os(
 
     # Load templates
     templates = provider.get_or_create_collection(_templates_collection_name(os_name))
-    t_data = templates.get(include=["embeddings", "documents", "metadatas", "ids"]) or {}
-    t_ids = t_data.get("ids", [])
-    t_docs = t_data.get("documents", [])
-    t_embs = t_data.get("embeddings", [])
+    t_data = templates.get(include=["embeddings", "documents", "metadatas"]) or {}
+    t_ids = t_data.get("ids") or []
+    t_docs = t_data.get("documents") or []
+    t_embs = t_data.get("embeddings") or []
 
     ids: List[str] = list(t_ids)
     docs: List[str] = list(t_docs)
-    embs: List[List[float]] = list(t_embs)
+    embs: List[List[float]] = [list(e) for e in t_embs]
 
     # Optionally sample from logs_<os>
     if include_logs_samples and include_logs_samples > 0:
         logs = provider.get_or_create_collection(_logs_collection_name(os_name))
-        l_data = logs.get(include=["embeddings", "documents", "metadatas", "ids"], limit=int(include_logs_samples)) or {}
-        ids.extend(l_data.get("ids", []))
-        docs.extend(l_data.get("documents", []))
-        embs.extend(l_data.get("embeddings", []))
+        l_data = logs.get(include=["embeddings", "documents", "metadatas"], limit=int(include_logs_samples)) or {}
+        ids.extend(l_data.get("ids") or [])
+        docs.extend(l_data.get("documents") or [])
+        embs.extend([list(e) for e in (l_data.get("embeddings") or [])])
 
     if not embs:
         return {"os": os_name, "clusters": 0, "prototypes": 0}

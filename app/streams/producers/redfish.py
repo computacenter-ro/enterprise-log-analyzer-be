@@ -29,7 +29,7 @@ class RedfishProducer(ProducerPlugin):
         self.auth_pass: str = str((config.get("auth") or {}).get("password") or "")
         self.hosts: List[str] = list(config.get("hosts") or [])
         self.ome_base_url: str = str(config.get("ome_base_url") or "")
-        self._source_id: Optional[int] = int(config.get("_source_id")) if config.get("_source_id") is not None else None
+        self._source_id: Optional[int] = int(config.get("_source_id") or 0) if config.get("_source_id") is not None else None
         self._stop = False
         # cursors by key (host or device id)
         self._last_log_time: Dict[str, str] = {}

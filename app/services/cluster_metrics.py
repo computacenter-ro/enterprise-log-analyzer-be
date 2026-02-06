@@ -223,11 +223,11 @@ class ClusterMetricsTracker:
         
         # Increment counters
         hour_key = f"cluster_metrics:online:{os_name}:{datetime.utcnow().strftime('%Y-%m-%d-%H')}"
-        await self.redis.hincrby(hour_key, "total_assignments", 1)
-        await self.redis.expire(hour_key, 7 * 24 * 3600)
+        await self.redis.hincrby(hour_key, "total_assignments", 1)  # type: ignore[misc]
+        await self.redis.expire(hour_key, 7 * 24 * 3600)  # type: ignore[misc]
         
         if is_new_cluster:
-            await self.redis.hincrby(hour_key, "new_clusters", 1)
+            await self.redis.hincrby(hour_key, "new_clusters", 1)  # type: ignore[misc]
         
         # Track distance distribution (store in sorted set for percentile queries)
         distance_key = f"cluster_metrics:distances:{os_name}:{datetime.utcnow().strftime('%Y-%m-%d-%H')}"
@@ -249,15 +249,15 @@ class ClusterMetricsTracker:
         
         # Aggregate metrics by hour
         hour_key = f"cluster_metrics:llm:{datetime.utcnow().strftime('%Y-%m-%d-%H')}"
-        await self.redis.hincrby(hour_key, "total_calls", 1)
-        await self.redis.hincrbyfloat(hour_key, "total_tokens", float(tokens_used))
-        await self.redis.hincrbyfloat(hour_key, "total_latency_ms", latency_ms)
-        await self.redis.expire(hour_key, 7 * 24 * 3600)
+        await self.redis.hincrby(hour_key, "total_calls", 1)  # type: ignore[misc]
+        await self.redis.hincrbyfloat(hour_key, "total_tokens", float(tokens_used))  # type: ignore[misc]
+        await self.redis.hincrbyfloat(hour_key, "total_latency_ms", latency_ms)  # type: ignore[misc]
+        await self.redis.expire(hour_key, 7 * 24 * 3600)  # type: ignore[misc]
         
         if success:
-            await self.redis.hincrby(hour_key, "successful_calls", 1)
+            await self.redis.hincrby(hour_key, "successful_calls", 1)  # type: ignore[misc]
         else:
-            await self.redis.hincrby(hour_key, "failed_calls", 1)
+            await self.redis.hincrby(hour_key, "failed_calls", 1)  # type: ignore[misc]
         
         # Track confidence distribution
         if confidence is not None:
@@ -267,7 +267,7 @@ class ClusterMetricsTracker:
         
         # Calculate cost (using OpenAI pricing as default)
         cost = (tokens_used / 1000.0) * settings.LLM_COST_PER_1K_TOKENS
-        await self.redis.hincrbyfloat(hour_key, "total_cost_usd", cost)
+        await self.redis.hincrbyfloat(hour_key, "total_cost_usd", cost)  # type: ignore[misc]
     
     async def get_quality_metrics(self, os_name: str, hours: int = 24) -> List[Dict[str, Any]]:
         """Retrieve quality metrics for the last N hours."""
@@ -307,7 +307,7 @@ class ClusterMetricsTracker:
             hour_str = hour_dt.strftime('%Y-%m-%d-%H')
             
             hour_key = f"cluster_metrics:online:{os_name}:{hour_str}"
-            data = await self.redis.hgetall(hour_key)
+            data = await self.redis.hgetall(hour_key)  # type: ignore[misc]
             
             if data:
                 metrics.append({
@@ -328,7 +328,7 @@ class ClusterMetricsTracker:
             hour_str = hour_dt.strftime('%Y-%m-%d-%H')
             
             hour_key = f"cluster_metrics:llm:{hour_str}"
-            data = await self.redis.hgetall(hour_key)
+            data = await self.redis.hgetall(hour_key)  # type: ignore[misc]
             
             if data:
                 total_calls = int(data.get("total_calls", 0))

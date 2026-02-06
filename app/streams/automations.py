@@ -133,9 +133,11 @@ async def _servicenow(params: Dict[str, Any], alert: Dict[str, Any]) -> None:
     user = os.environ.get("SN_USER") or params.get("user") or ""
     password = os.environ.get("SN_PASSWORD") or params.get("password") or ""
     payload = {k: _render(str(v), alert) for k, v in (params.get("payload") or {}).items()}
-    auth = (user, password) if user or password else None
     async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(f"{base}/api/now/table/{table}", auth=auth, json=payload)
+        if user or password:
+            r = await client.post(f"{base}/api/now/table/{table}", auth=(user, password), json=payload)
+        else:
+            r = await client.post(f"{base}/api/now/table/{table}", json=payload)
         r.raise_for_status()
 
 

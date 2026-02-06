@@ -3,7 +3,7 @@ import os
 import logging
 from pathlib import Path
 
-import aiofiles
+import aiofiles  # type: ignore[import-untyped]
 from fastapi import FastAPI
 import redis.asyncio as aioredis
 from redis.exceptions import ConnectionError as RedisConnectionError

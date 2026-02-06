@@ -16,10 +16,13 @@ def normalize_snmp(_: str, payload: Dict[str, Any], cfg: Dict[str, Any]) -> List
     m = mappings.get(oid)
     if not m:
         return []
+    if val is None:
+        return []
     try:
         num = float(val)
-        if "scale" in m:
-            num *= float(m["scale"])
+        scale = m.get("scale")
+        if scale is not None:
+            num *= float(scale)
     except Exception:
         return []
     mp: MetricPoint = {

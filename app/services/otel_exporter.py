@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, Sequence
 
 from app.core.config import get_settings
 
@@ -39,7 +39,7 @@ def _setup_otel() -> None:
         _otel_ready = False
 
 
-def export_metrics(points: List[Dict[str, Any]]) -> None:
+def export_metrics(points: Sequence[Dict[str, Any]]) -> None:
     """Best-effort export: record metrics as histograms with attributes.
     Uses dynamic instruments by metric name. If OTel is not available, no-op.
     """
@@ -55,11 +55,13 @@ def export_metrics(points: List[Dict[str, Any]]) -> None:
         # Avoid unbounded instrument creation by limiting unique names
         for mp in points[:1000]:
             name = str(mp.get("name") or "metric.value")
-            unit = mp.get("unit")
+            unit = mp.get("unit") or ""
             value = mp.get("value")
+            if value is None:
+                continue
             attributes = {**(mp.get("resource") or {}), **(mp.get("attributes") or {})}
             # Use histogram to record numeric values generically
-            hist = _meter.create_histogram(name, unit=unit or None)
+            hist = _meter.create_histogram(name, unit=unit)
             try:
                 v = float(value)
             except Exception:

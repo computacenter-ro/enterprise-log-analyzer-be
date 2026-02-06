@@ -149,7 +149,8 @@ async def run_enricher():
                             templated_summary = tmpl or (raw or "")
 
                     # neighbors from templates for coarse context
-                    neighbors = await _retrieve_neighbors(os_name, templated_summary or (logs[0].get("templated") if logs else ""), k=8)
+                    templated_for_neighbors = templated_summary or (logs[0].get("templated") if logs else None) or ""
+                    neighbors = await _retrieve_neighbors(os_name, templated_for_neighbors, k=8)
                     # HYDE queries and retrieval from logs_<os>
                     queries = generate_hypothesis(os_name, templated_summary, logs, num_queries=3)
                     retrieved = await _retrieve_logs_by_queries(os_name, queries, k_per_query=5)
@@ -174,7 +175,7 @@ async def run_enricher():
                         "result": json.dumps(result),
                         "log_ids": json.dumps(log_ids),
                     }
-                    entry_id = await redis.xadd(settings.ALERTS_STREAM, payload)
+                    entry_id = await redis.xadd(settings.ALERTS_STREAM, payload)  # type: ignore[misc]
                     try:
                         logging.getLogger("app.kaboom").info(
                             "alert_published id=%s os=%s type=%s",
@@ -187,8 +188,8 @@ async def run_enricher():
                         key = f"alert:{entry_id}"
                         # Store fields as strings for consistency
                         to_store = {**payload, "id": entry_id}
-                        await redis.hset(key, mapping=to_store)
-                        await redis.expire(key, int(settings.ALERTS_TTL_SEC))
+                        await redis.hset(key, mapping=to_store)  # type: ignore[misc]
+                        await redis.expire(key, int(settings.ALERTS_TTL_SEC))  # type: ignore[misc]
                     except Exception as e:
                         LOG.info("failed to store alert hash id=%s err=%s", entry_id, e)
                 except Exception as exc:

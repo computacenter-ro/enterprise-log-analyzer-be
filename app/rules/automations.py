@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 _cache: Dict[str, Any] | None = None

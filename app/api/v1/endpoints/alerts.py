@@ -127,8 +127,8 @@ async def persist_alert(entry_id: str) -> Dict[str, Any]:
         to_store = {**fields, "id": entry_id}
         await redis.hset(key, mapping=to_store)
     # Remove TTL and mark persisted
-    await redis.persist(key)
-    await redis.sadd(settings.ALERTS_PERSISTED_SET, entry_id)
+    await redis.persist(key)  # type: ignore[misc]
+    await redis.sadd(settings.ALERTS_PERSISTED_SET, entry_id)  # type: ignore[misc]
     return {"status": "ok", "id": entry_id}
 
 
@@ -148,7 +148,7 @@ async def add_feedback(entry_id: str, feedback: str = Query(..., pattern="^(corr
     else:
         pipe.sadd(settings.ALERTS_FEEDBACK_INCORRECT_SET, entry_id)
         pipe.srem(settings.ALERTS_FEEDBACK_CORRECT_SET, entry_id)
-    await pipe.execute()
+    await pipe.execute()  # type: ignore[misc]
     
     return {"status": "ok", "id": entry_id, "feedback": feedback}
 
