@@ -22,7 +22,7 @@ jobs:
     uses: computacenter-ro/github-workflows-docker/.github/workflows/docker-deploy.yml@main
     with:
       runs-on: '["self-hosted", "ccro-macstudio-one"]'
-      compose-services: 'log-analyzer-backend,log-analyzer-postgres'
+      compose-services: 'log-analyzer-backend'
       compose-file: 'docker-compose.mac.yml'
       deploy-directory: '$HOME/enterprise-log-analyzer-deploy'
       health-check-url: 'http://localhost:8012/'

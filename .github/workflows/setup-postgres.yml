@@ -1,0 +1,14 @@
+name: Setup PostgreSQL Database
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  create-database:
+    uses: computacenter-ro/github-workflows-docker/.github/workflows/postgres-database-setup.yml@main
+    with:
+      runs-on: '["self-hosted", "ccro-macstudio-one"]'
+      database-names: 'aiops_db'
+      database-users: 'aiops_user'
+      database-passwords: '${{ secrets.POSTGRES_PASSWORD }}'
+    secrets: inherit

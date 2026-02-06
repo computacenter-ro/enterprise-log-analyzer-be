@@ -1,25 +1,22 @@
 networks:
-  log-analyzer-network:
+  aiops-network:
     name: shared-network
     external: true
 
 volumes:
-  postgres_data:
-    name: enterprise-log-analyzer-postgres-data
-    driver: local
   chroma_data:
-    name: enterprise-log-analyzer-chroma-data
+    name: enterprise-aiops-chroma-data
     driver: local
 
 services:
-  log-analyzer-backend:
-    image: enterprise-log-analyzer-backend:latest
+  aiops-backend:
+    image: enterprise-aiops-backend:latest
     build:
       context: .
       dockerfile: Dockerfile
       args:
         - BUILDKIT_INLINE_CACHE=1
-    container_name: enterprise-log-analyzer-backend
+    container_name: enterprise-aiops-backend
     restart: always
     environment:
       # Application
@@ -29,12 +26,12 @@ services:
       DEBUG: ${DEBUG:-False}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
-      # Database
-      POSTGRES_SERVER: ${POSTGRES_SERVER:-log-analyzer-postgres}
-      POSTGRES_USER: ${POSTGRES_USER:-fastapi}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fastapi}
-      POSTGRES_DB: ${POSTGRES_DB:-fastapi}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-fastapi}:${POSTGRES_PASSWORD:-fastapi}@${POSTGRES_SERVER:-log-analyzer-postgres}:5432/${POSTGRES_DB:-fastapi}
+      # Database (connects to shared PostgreSQL instance)
+      POSTGRES_SERVER: ${POSTGRES_SERVER:-postgres_shared}
+      POSTGRES_USER: ${POSTGRES_USER:-aiops_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-aiops_db}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aiops_user}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER:-postgres_shared}:5432/${POSTGRES_DB:-aiops_db}
 
       # Redis
       REDIS_URL: ${REDIS_URL:-redis://redis_shared:6379/0}
@@ -74,7 +71,7 @@ services:
       ALERTS_TTL_SEC: ${ALERTS_TTL_SEC:-86400}
 
       # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://log-analyzer.ccrolabs.com,https://log-analyzer-api.ccrolabs.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://aiops.ccrolabs.com,https://aiops-api.ccrolabs.com}
 
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
@@ -83,10 +80,7 @@ services:
     volumes:
       - chroma_data:/app/.chroma
     networks:
-      - log-analyzer-network
-    depends_on:
-      log-analyzer-postgres:
-        condition: service_healthy
+      - aiops-network
     healthcheck:
       test:
         - CMD
@@ -104,32 +98,4 @@ services:
         fluentd-async: "true"
         fluentd-retry-wait: "1s"
         fluentd-max-retries: "30"
-        tag: log-analyzer.backend
-
-  log-analyzer-postgres:
-    image: postgres:16
-    container_name: enterprise-log-analyzer-postgres
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-fastapi}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fastapi}
-      POSTGRES_DB: ${POSTGRES_DB:-fastapi}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - log-analyzer-network
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER:-fastapi} -d ${POSTGRES_DB:-fastapi}
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: 50m
-        max-file: "10"
+        tag: aiops.backend
