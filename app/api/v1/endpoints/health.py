@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 router = APIRouter()
 
 
-@router.get("/", tags=["health"])
+@router.get("", tags=["health"])
 async def health() -> dict[str, object]:
     """Lightweight health endpoint for liveness checks."""
     return {

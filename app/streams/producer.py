@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 async def _tail_file(path: Path):
     """Push existing lines from `path` and then follow new lines, sending each to Redis."""
     source = path.name
-    async with aiofiles.open(path, mode="r") as f:
+    async with aiofiles.open(path, mode="r", encoding="utf-8", errors="replace") as f:
         # push existing lines
         await f.seek(0)
         while True:

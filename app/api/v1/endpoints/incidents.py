@@ -12,7 +12,7 @@ settings = get_settings()
 redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
-@router.get("/")
+@router.get("")
 async def list_incidents(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, Any]]:
     """List incidents published by the issues aggregator from the Redis stream."""
     # Newest first

@@ -1,0 +1,29 @@
+name: Deploy to Mac Studio One
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # Build Docker images
+  build:
+    uses: computacenter-ro/github-workflows-docker/.github/workflows/docker-build.yml@main
+    with:
+      runs-on: '["self-hosted", "ccro-macstudio-one"]'
+      compose-services: 'log-analyzer-backend'
+      remove-images: 'enterprise-log-analyzer-backend:latest'
+      compose-file: 'docker-compose.mac.yml'
+    secrets: inherit
+
+  # Deploy services
+  deploy:
+    needs: build
+    uses: computacenter-ro/github-workflows-docker/.github/workflows/docker-deploy.yml@main
+    with:
+      runs-on: '["self-hosted", "ccro-macstudio-one"]'
+      compose-services: 'log-analyzer-backend,log-analyzer-postgres'
+      compose-file: 'docker-compose.mac.yml'
+      deploy-directory: '$HOME/enterprise-log-analyzer-deploy'
+      health-check-url: 'http://localhost:8012/'
+    secrets: inherit

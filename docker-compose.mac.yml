@@ -1,0 +1,135 @@
+networks:
+  log-analyzer-network:
+    name: shared-network
+    external: true
+
+volumes:
+  postgres_data:
+    name: enterprise-log-analyzer-postgres-data
+    driver: local
+  chroma_data:
+    name: enterprise-log-analyzer-chroma-data
+    driver: local
+
+services:
+  log-analyzer-backend:
+    image: enterprise-log-analyzer-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: enterprise-log-analyzer-backend
+    restart: always
+    environment:
+      # Application
+      PROJECT_NAME: ${PROJECT_NAME:-Enterprise Log Analyzer}
+      API_PREFIX: ${API_PREFIX:-/api/v1}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-False}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Database
+      POSTGRES_SERVER: ${POSTGRES_SERVER:-log-analyzer-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-fastapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fastapi}
+      POSTGRES_DB: ${POSTGRES_DB:-fastapi}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-fastapi}:${POSTGRES_PASSWORD:-fastapi}@${POSTGRES_SERVER:-log-analyzer-postgres}:5432/${POSTGRES_DB:-fastapi}
+
+      # Redis
+      REDIS_URL: ${REDIS_URL:-redis://redis_shared:6379/0}
+
+      # Chroma
+      CHROMA_MODE: ${CHROMA_MODE:-local}
+      CHROMA_PERSIST_DIRECTORY: /app/.chroma
+
+      # Embedding provider
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-sentence-transformers}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+
+      # LLM provider
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-https://inference.ccrolabs.com}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-llama3.1:8b-instruct-q8_0}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+
+      # OpenAI (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+
+      # Feature toggles
+      ENABLE_PRODUCER: ${ENABLE_PRODUCER:-false}
+      ENABLE_ENRICHER: ${ENABLE_ENRICHER:-false}
+      ENABLE_AUTOMATIONS: ${ENABLE_AUTOMATIONS:-false}
+      ENABLE_CLUSTER_ENRICHER: ${ENABLE_CLUSTER_ENRICHER:-false}
+      ENABLE_METRICS_NORMALIZATION: ${ENABLE_METRICS_NORMALIZATION:-false}
+      ENABLE_OTEL_EXPORT: ${ENABLE_OTEL_EXPORT:-false}
+
+      # Thresholds
+      NEAREST_PROTO_THRESHOLD: ${NEAREST_PROTO_THRESHOLD:-0.25}
+      CLUSTER_MIN_SIZE: ${CLUSTER_MIN_SIZE:-5}
+      CLUSTER_DISTANCE_THRESHOLD: ${CLUSTER_DISTANCE_THRESHOLD:-0.2}
+      ISSUE_INACTIVITY_SEC: ${ISSUE_INACTIVITY_SEC:-120}
+      ALERTS_TTL_SEC: ${ALERTS_TTL_SEC:-86400}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://log-analyzer.ccrolabs.com,https://log-analyzer-api.ccrolabs.com}
+
+      PYTHONUNBUFFERED: 1
+      PYTHONDONTWRITEBYTECODE: 1
+    ports:
+      - "8012:8000"
+    volumes:
+      - chroma_data:/app/.chroma
+    networks:
+      - log-analyzer-network
+    depends_on:
+      log-analyzer-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8000/
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: host.docker.internal:24224
+        fluentd-async: "true"
+        fluentd-retry-wait: "1s"
+        fluentd-max-retries: "30"
+        tag: log-analyzer.backend
+
+  log-analyzer-postgres:
+    image: postgres:16
+    container_name: enterprise-log-analyzer-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fastapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fastapi}
+      POSTGRES_DB: ${POSTGRES_DB:-fastapi}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - log-analyzer-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-fastapi} -d ${POSTGRES_DB:-fastapi}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "10"

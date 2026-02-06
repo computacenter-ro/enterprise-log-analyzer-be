@@ -5,6 +5,7 @@ from typing import Optional
 import chromadb
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
+from pathlib import Path
 
 from app.core.config import settings
 import re
@@ -12,6 +13,8 @@ from app.services.embedding import (
     SentenceTransformerEmbeddingFunction,
     OpenAIEmbeddingFunction,
     OllamaEmbeddingFunction,
+    LogBERTEmbeddingFunction,
+    LogBERTClientEmbeddingFunction,
 )
 
 
@@ -35,10 +38,34 @@ class ChromaClientProvider:
                 base_url=settings.OLLAMA_BASE_URL,
                 model=settings.OLLAMA_EMBEDDING_MODEL,
             )
+        elif provider == "logbert":
+            # Check if external LogBERT service is configured
+            if settings.LOGBERT_BASE_URL:
+                # Use external LogBERT microservice (OpenAI-compatible API)
+                logbert_base = settings.LOGBERT_BASE_URL.rstrip("/")
+                self.embedding_fn = LogBERTClientEmbeddingFunction(
+                    base_url=logbert_base,
+                    model_name=settings.LOGBERT_MODEL_NAME,
+                )
+            else:
+                # Use local LogBERT (loads model in-process)
+                self.embedding_fn = LogBERTEmbeddingFunction(
+                    model_name=settings.LOGBERT_MODEL_NAME,
+                    device=settings.LOGBERT_DEVICE,
+                )
+        elif provider == "tei":
+            # Text Embeddings Inference - HuggingFace's high-performance embedding server
+            # Reuses OpenAIEmbeddingFunction since TEI exposes OpenAI-compatible /v1/embeddings
+            tei_base = settings.TEI_BASE_URL.rstrip("/")
+            self.embedding_fn = OpenAIEmbeddingFunction(
+                model=settings.TEI_MODEL_NAME,
+                api_key=settings.TEI_API_KEY,
+                base_url=f"{tei_base}/v1",
+            )
         else:
             raise ValueError(
                 f"Unknown EMBEDDING_PROVIDER '{settings.EMBEDDING_PROVIDER}'. "
-                "Supported: openai, sentence-transformers, ollama"
+                "Supported: openai, sentence-transformers, ollama, logbert, tei"
             )
         self._client = self._create_client()
 
@@ -49,7 +76,15 @@ class ChromaClientProvider:
                 port=settings.CHROMA_SERVER_PORT,
             )
         # default to local persistent client
-        return chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIRECTORY)
+        # Resolve to an absolute path to avoid losing data when cwd changes across restarts
+        try:
+            persist_path = str(Path(settings.CHROMA_PERSIST_DIRECTORY).resolve())
+            # Ensure directory exists
+            Path(persist_path).mkdir(parents=True, exist_ok=True)
+        except Exception:
+            # Fall back to the raw setting if resolution fails for any reason
+            persist_path = settings.CHROMA_PERSIST_DIRECTORY
+        return chromadb.PersistentClient(path=persist_path)
 
     @property
     def client(self) -> ClientAPI:

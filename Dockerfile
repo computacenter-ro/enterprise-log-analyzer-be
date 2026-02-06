@@ -9,7 +9,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential gcc \
+    && apt-get install -y --no-install-recommends build-essential gcc libgomp1 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
@@ -42,6 +42,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy application code
 COPY . /app
+# Copy simulation-api module for mock API
+COPY ./simulation-api /app/simulation-api
 
 ###############################################
 # Runtime image                                #
@@ -53,9 +55,24 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     POETRY_VIRTUALENVS_CREATE=false \
+    # HuggingFace / Transformers cache paths set to a writable location inside the container
+    HF_HOME="/tmp/hf_cache" \
+    TRANSFORMERS_CACHE="/tmp/hf_cache" \
+    TORCH_HOME="/tmp/torch_cache" \
+    TOKENIZERS_PARALLELISM=false \
+    HF_HUB_DISABLE_TELEMETRY=1 \
     APP_MODULE="app.main:app" \
     HOST="0.0.0.0" \
     PORT="8000"
+
+# Install runtime libs needed by Torch/Transformers and HTTPS
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Defaults for built-in mock API (accessible via localhost inside the container)
+ENV MOCK_HOST="127.0.0.1" \
+    MOCK_PORT="8086"
 
 # Workdir inside runtime image
 WORKDIR /app
@@ -65,11 +82,25 @@ COPY --from=builder /opt/venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
+# Add app directory to Python path for producer
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Add simulation-api to Python path for producer
+ENV PYTHONPATH="/app/simulation-api:${PYTHONPATH}"
+
 # Copy project source
 COPY --from=builder /app /app
+
+# Ensure Chroma persistence directory exists and is writable even for non-root UIDs
+RUN mkdir -p /app/.chroma && chmod 777 /app/.chroma
 
 # Expose port that the service will listen on
 EXPOSE ${PORT}
 
-# Start the application using Uvicorn (use shell to expand env vars reliably)
-CMD ["/bin/sh", "-c", "uvicorn $APP_MODULE --host $HOST --port $PORT --workers 2"]
+# Add entrypoint script to start main app and mock API in parallel
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Start both services (main API + mock API). Main app remains reachable at $HOST:$PORT,
+# mock API is bound to ${MOCK_HOST}:${MOCK_PORT} so the main app can call http://localhost:${MOCK_PORT}.
+CMD ["/usr/local/bin/start.sh"]

@@ -27,7 +27,7 @@ def _parse_result(raw: str | None) -> Dict[str, Any]:
             return {"raw": raw}
 
 
-@router.get("/")
+@router.get("")
 async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, Any]]:
     """List alerts from the last ALERTS_TTL_SEC and include any persisted ones."""
     now_ms = int(time.time() * 1000)

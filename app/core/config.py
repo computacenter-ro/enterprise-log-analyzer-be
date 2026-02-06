@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     CHROMA_SERVER_PORT: int = 8000
 
     # Embedding provider and models
-    EMBEDDING_PROVIDER: str = "openai"  # "openai" | "sentence-transformers" | "ollama"
+    EMBEDDING_PROVIDER: str = "openai"  # "openai" | "sentence-transformers" | "ollama" | "logbert" | "tei"
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"  # used when provider=sentence-transformers
     OPENAI_API_KEY: str | None = None
     OPENAI_ORG_ID: str | None = None
@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     # Ollama config (used when provider=ollama)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
+    # LogBERT config (used when provider=logbert)
+    LOGBERT_MODEL_NAME: str = "bert-base-uncased"  # HuggingFace model name
+    LOGBERT_DEVICE: str = "cpu"  # "cpu" or "cuda" for GPU
+    LOGBERT_USE_RAW_LOGS: bool = True  # Use raw logs instead of templated (semantic clustering)
+    LOGBERT_BASE_URL: str | None = None  # If set, use external LogBERT service instead of local
+    # Text Embeddings Inference config (used when provider=tei)
+    # TEI is a HuggingFace service that provides OpenAI-compatible embedding API
+    # Deploy with: ghcr.io/huggingface/text-embeddings-inference:1.8
+    TEI_BASE_URL: str = "http://localhost:8081"  # Base URL of TEI server
+    TEI_MODEL_NAME: str = "bert-base-uncased"  # Model name for identification (TEI uses model it was started with)
+    TEI_API_KEY: str | None = None  # Optional API key (TEI doesn't require auth by default)
     # LLM provider and models (inference/classification)
     LLM_PROVIDER: str = "openai"  # "openai" | "ollama"
     OLLAMA_CHAT_MODEL: str = "mistral"
@@ -93,7 +104,25 @@ class Settings(BaseSettings):
     AUTOMATIONS_DRY_RUN: bool = True
     ENABLE_CLUSTER_ENRICHER: bool = True
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # Observability settings
+    ENABLE_CLUSTER_METRICS: bool = True
+    METRICS_AGGREGATION_INTERVAL_SEC: int = 300  # 5 minutes
+    CLUSTER_QUALITY_THRESHOLD: float = 0.3  # Min silhouette score
+    DRIFT_DETECTION_WINDOW_SEC: int = 3600  # 1 hour
+    LLM_COST_PER_1K_TOKENS: float = 0.0001  # OpenAI pricing for gpt-4o-mini
+    # HTTP request logging toggle (middleware). Set to false to suppress request logs
+    REQUEST_LOGS_ENABLED: bool = True
+
+    # Logging configuration (read by logging_config)
+    LOG_LEVEL: str = "INFO"
+    SQLALCHEMY_LOG_LEVEL: str = "WARNING"
+    UVICORN_ACCESS_LOG: bool = False
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @property
     def sqlalchemy_database_uri(self) -> str:

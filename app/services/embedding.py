@@ -8,14 +8,10 @@ import numpy as np
 import ollama
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
-# Assuming settings are configured elsewhere, for example:
-# from app.core.config import settings
-class MockSettings:
-    OPENAI_API_KEY = "your-api-key-here"
-    OPENAI_ORG_ID = "your-org-id-here"
-    OPENAI_PROJECT = "your-project-id-here"
+from transformers import AutoTokenizer, AutoModel
+import torch
 
-settings = MockSettings()
+from app.core.config import settings
 
 
 class SentenceTransformerEmbeddingFunction:
@@ -45,7 +41,210 @@ class SentenceTransformerEmbeddingFunction:
         return self([input])
 
 
-# --- CORRECTED FUNCTION ---
+class LogBERTEmbeddingFunction:
+    """LogBERT embeddings for semantic log understanding."""
+
+    _logged_ready_keys: set[str] = set()
+
+    @staticmethod
+    def _has_meta_tensors(model: torch.nn.Module) -> bool:
+        for tensor in model.parameters():
+            if tensor.device.type == "meta":
+                return True
+        for tensor in model.buffers():
+            if tensor.device.type == "meta":
+                return True
+        return False
+
+    def __init__(self, model_name: str = "bert-base-uncased", device: str = "cpu") -> None:
+        self.model_name = model_name
+        logger = logging.getLogger(__name__)
+
+        # Force CPU to ensure stability and avoid meta/cuda mismatch errors
+        self.device = "cpu"
+
+        try:
+            # Minimal kwargs: removed device_map and low_cpu_mem_usage to prevent
+            # 'accelerate' from intervening and leaving tensors on the 'meta' device.
+            load_kwargs: dict[str, object] = {
+                "trust_remote_code": True,
+            }
+
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            
+            # Standard load. Without device_map, this loads directly to CPU RAM.
+            self.model = AutoModel.from_pretrained(model_name, **load_kwargs)
+
+            # Verify that weights are actually loaded (not meta)
+            if LogBERTEmbeddingFunction._has_meta_tensors(self.model):
+                logger.warning(
+                    "LogBERT model loaded with meta tensors. Attempting to force materialization to CPU."
+                )
+                # Fallback: try to force move (though usually from_pretrained should have done this)
+                # If this fails, the environment configuration for transformers/accelerate is likely forcing meta.
+                self.model.to_empty(device="cpu") 
+                # Note: to_empty initializes random weights; purely for structure. 
+                # Ideally we want real weights. If we are here, the real weights failed to load.
+                # Re-raising to alert the user is safer than using random weights.
+                raise RuntimeError(
+                    "LogBERT model loaded as meta tensors (empty weights). "
+                    "This usually indicates an issue with 'accelerate' or 'device_map' settings in the environment."
+                )
+
+            self.model.eval()
+
+            if model_name not in LogBERTEmbeddingFunction._logged_ready_keys:
+                logger.info("logbert embedding provider ready model=%s device=%s", model_name, self.device)
+                LogBERTEmbeddingFunction._logged_ready_keys.add(model_name)
+        except Exception as e:
+            logger.error("logbert embedding provider failed to initialize model=%s err=%s", model_name, e)
+            raise
+
+    def _mean_pooling(self, model_output: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        token_embeddings = model_output[0]
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+            input_mask_expanded.sum(1), min=1e-9
+        )
+
+    def __call__(self, input: Iterable[str]) -> List[List[float]]:
+        # Chroma may pass in a variety of types here (str, list[str], tuples, etc.).
+        # Coerce everything defensively to plain strings to avoid tokenizer
+        # type errors like:
+        # "TextEncodeInput must be Union[TextInputSequence, Tuple[InputSequence, InputSequence]]"
+        raw_items = list(input)
+        if not raw_items:
+            return []
+
+        texts: List[str] = []
+        for value in raw_items:
+            if isinstance(value, str):
+                texts.append(value)
+            elif isinstance(value, (list, tuple)):
+                try:
+                    texts.append(" ".join(map(str, value)))
+                except Exception:
+                    texts.append(str(value))
+            elif value is None:
+                texts.append("")
+            else:
+                texts.append(str(value))
+
+        encoded = self.tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            max_length=512,
+            return_tensors="pt",
+        )
+
+        # Ensure inputs are on the correct device (CPU)
+        encoded = {k: v.to(self.device) for k, v in encoded.items()}
+
+        with torch.no_grad():
+            model_output = self.model(**encoded)
+
+        embeddings = self._mean_pooling(model_output, encoded["attention_mask"])
+        embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+
+        result = embeddings.cpu().numpy().tolist()
+
+        return result
+
+    def name(self) -> str:
+        return f"logbert::{self.model_name}"
+
+    def embed_documents(self, input: Iterable[str]) -> List[List[float]]:
+        return self(list(input))
+
+    def embed_query(self, input: str) -> List[List[float]]:
+        return self([input])
+
+
+class LogBERTClientEmbeddingFunction:
+    """Client for external LogBERT embedding service.
+    
+    Connects to the LogBERT microservice which exposes an OpenAI-compatible
+    /v1/embeddings endpoint. This decouples the BERT model from the main
+    application, allowing for independent scaling and deployment.
+    """
+
+    _logged_ready_keys: set[str] = set()
+
+    def __init__(self, base_url: str, model_name: str = "bert-base-uncased") -> None:
+        """Initialize the LogBERT client.
+        
+        Args:
+            base_url: Base URL of the LogBERT service (e.g., http://logbert:8080)
+            model_name: Model name for identification (service uses its configured model)
+        """
+        self.base_url = base_url.rstrip("/")
+        self.model_name = model_name
+        logger = logging.getLogger(__name__)
+        
+        # Use OpenAI SDK to talk to the LogBERT service
+        self.client = OpenAI(
+            api_key="not-needed",  # LogBERT doesn't require auth
+            base_url=f"{self.base_url}/v1",
+        )
+        
+        # One-time readiness check
+        if base_url not in LogBERTClientEmbeddingFunction._logged_ready_keys:
+            try:
+                # Quick health check
+                import httpx
+                response = httpx.get(f"{self.base_url}/health", timeout=10.0)
+                if response.status_code == 200:
+                    health = response.json()
+                    logger.info(
+                        "logbert client ready url=%s model=%s dim=%s",
+                        base_url,
+                        health.get("model", "unknown"),
+                        health.get("embedding_dim", "unknown"),
+                    )
+                    LogBERTClientEmbeddingFunction._logged_ready_keys.add(base_url)
+            except Exception as e:
+                logger.warning("logbert service not reachable url=%s err=%s", base_url, e)
+
+    def __call__(self, input: Iterable[str]) -> List[List[float]]:
+        """Generate embeddings for input texts."""
+        texts = list(input)
+        if not texts:
+            return []
+
+        # Coerce all inputs to strings
+        clean_texts: List[str] = []
+        for value in texts:
+            if isinstance(value, str):
+                clean_texts.append(value)
+            elif isinstance(value, (list, tuple)):
+                try:
+                    clean_texts.append(" ".join(map(str, value)))
+                except Exception:
+                    clean_texts.append(str(value))
+            elif value is None:
+                clean_texts.append("")
+            else:
+                clean_texts.append(str(value))
+
+        # Call the LogBERT service
+        response = self.client.embeddings.create(
+            model=self.model_name,
+            input=clean_texts,
+        )
+        
+        return [emb.embedding for emb in response.data]
+
+    def name(self) -> str:
+        return f"logbert-client::{self.model_name}"
+
+    def embed_documents(self, input: Iterable[str]) -> List[List[float]]:
+        return self(list(input))
+
+    def embed_query(self, input: str) -> List[List[float]]:
+        return self([input])
+
+
 def embed_single_text(
     embedding_function: SentenceTransformerEmbeddingFunction, text: str
 ) -> List[List[float]]:
@@ -57,16 +256,37 @@ def embed_single_text(
 
 
 class OpenAIEmbeddingFunction:
-    """OpenAI embeddings adapter compatible with Chroma's embedding_function interface."""
+    """OpenAI embeddings adapter compatible with Chroma's embedding_function interface.
+    
+    This class also works with any OpenAI-compatible API, including:
+    - HuggingFace Text Embeddings Inference (TEI)
+    - vLLM
+    - LocalAI
+    - Any server exposing /v1/embeddings endpoint
+    """
 
-    def __init__(self, model: str, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        """Initialize the OpenAI-compatible embedding function.
+        
+        Args:
+            model: Model name for the embeddings
+            api_key: API key (optional for some servers like TEI)
+            base_url: Custom base URL for OpenAI-compatible servers (e.g., TEI at http://localhost:8081/v1)
+        """
         # OpenAI Python SDK v1 uses client with api_key from env or provided
         self.client = OpenAI(
-            api_key=api_key or settings.OPENAI_API_KEY,
-            organization=settings.OPENAI_ORG_ID,
-            project=settings.OPENAI_PROJECT,
+            api_key=api_key or settings.OPENAI_API_KEY or "not-needed",
+            organization=settings.OPENAI_ORG_ID if not base_url else None,
+            project=settings.OPENAI_PROJECT if not base_url else None,
+            base_url=base_url,
         )
         self.model = model
+        self._base_url = base_url
 
     def __call__(self, input: Iterable[str]) -> List[List[float]]:
         inputs = list(input)
@@ -78,6 +298,8 @@ class OpenAIEmbeddingFunction:
         return [emb.embedding for emb in response.data]
 
     def name(self) -> str:  # pragma: no cover - simple getter
+        if self._base_url:
+            return f"openai-compatible::{self.model}"
         return f"openai::{self.model}"
 
     # Chroma compatibility helpers

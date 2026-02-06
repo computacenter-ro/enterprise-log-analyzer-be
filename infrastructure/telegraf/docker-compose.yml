@@ -1,0 +1,127 @@
+# =============================================================================
+# Docker Compose for Telegraf (Development/Testing)
+# =============================================================================
+#
+# This compose file runs Telegraf alongside the Enterprise Log Analyzer backend
+# for local development and testing.
+#
+# Usage:
+#   # Start with existing backend
+#   docker compose up -d telegraf
+#
+#   # View logs
+#   docker compose logs -f telegraf
+#
+#   # Stop
+#   docker compose down
+#
+# Note: On macOS, native Homebrew installation is recommended for full
+# functionality (macOS system logs are not accessible from Docker).
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Telegraf Agent
+  # ---------------------------------------------------------------------------
+  telegraf:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Match host's docker group GID for socket access
+        DOCKER_GID: ${DOCKER_GID:-999}
+
+    image: enterprise-log-analyzer/telegraf:latest
+    container_name: ela-telegraf
+
+    # Required environment variables
+    environment:
+      # Authentication (REQUIRED - obtain from /api/v1/sources)
+      TELEGRAF_TOKEN: ${TELEGRAF_TOKEN:?TELEGRAF_TOKEN is required}
+      TELEGRAF_AGENT_ID: ${TELEGRAF_AGENT_ID:?TELEGRAF_AGENT_ID is required}
+
+      # Backend connection
+      # Use host.docker.internal on Docker Desktop (Mac/Windows)
+      # Use actual IP or hostname on Linux
+      BACKEND_URL: ${BACKEND_URL:-http://host.docker.internal:8000}
+
+      # Agent identification
+      HOSTNAME: ${HOSTNAME:-telegraf-docker}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      REGION: ${REGION:-docker}
+      SERVICE_GROUP: ${SERVICE_GROUP:-enterprise-log-analyzer}
+
+      # Collection settings
+      COLLECTION_INTERVAL: ${COLLECTION_INTERVAL:-10s}
+      FLUSH_INTERVAL: ${FLUSH_INTERVAL:-10s}
+
+      # Script paths (inside container)
+      TELEGRAF_SCRIPTS_PATH: /etc/telegraf/scripts
+
+    # Volume mounts
+    volumes:
+      # Docker socket for container logs/metrics
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Optional: Mount host logs (Linux only, won't work on Mac/Windows)
+      # - /var/log:/var/log:ro
+
+      # Optional: Mount custom config for development
+      # - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      # - ./scripts:/etc/telegraf/scripts:ro
+
+    # Networking
+    networks:
+      - ela-network
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "telegraf"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  ela-network:
+    name: enterprise-log-analyzer
+    external: true
+
+# =============================================================================
+# Notes
+# =============================================================================
+#
+# To use with an existing backend network:
+#   1. Ensure your backend's docker-compose creates a network named
+#      'enterprise-log-analyzer' or update the network name above
+#   2. Or use 'network_mode: host' (Linux only)
+#
+# To get Docker GID on your system:
+#   - Linux: stat -c '%g' /var/run/docker.sock
+#   - macOS: stat -f '%g' /var/run/docker.sock
+#
+# =============================================================================
