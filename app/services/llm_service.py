@@ -77,8 +77,9 @@ def _chat_json_with_ollama(system: str, user_prompt: str, temperature: float) ->
             format="json",  # <-- Key improvement: Enforces JSON output
             options={"temperature": temperature}
         )
-        message = (resp or {}).get("message", {})
-        text = message.get("content", "{}")
+        resp_dict: Dict[str, Any] = dict(resp) if resp else {}
+        message_data: Dict[str, Any] = resp_dict.get("message") or {}
+        text = str(message_data.get("content") or "{}")
         return json.loads(text)
     except Exception as e:
         # Fallback is now safe from NameError

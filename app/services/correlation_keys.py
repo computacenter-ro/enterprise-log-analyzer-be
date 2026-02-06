@@ -74,7 +74,8 @@ def compute_key_correlation(keys: List[str], limit: int = 2000) -> Dict[str, Any
         metas = data.get("metadatas") or []
         for i in range(len(ids)):
             doc = docs[i] if i < len(docs) else ""
-            meta = metas[i] if i < len(metas) else {}
+            raw_meta = metas[i] if i < len(metas) else {}
+            meta: Dict[str, Any] = dict(raw_meta) if raw_meta else {}
             obj: Dict[str, Any] = {}
             try:
                 obj = json.loads(doc)

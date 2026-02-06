@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence, cast
 
 import redis.asyncio as aioredis
 
@@ -117,7 +117,7 @@ async def run_cluster_enricher() -> None:
                     if centroid_vec and len(centroid_vec) > 0:
                         try:
                             tcoll = _get_provider().get_or_create_collection(collection_name_for_os(os_name))
-                            q = tcoll.query(query_embeddings=[centroid_vec], n_results=8, include=["documents", "metadatas", "distances"]) or {}
+                            q = tcoll.query(query_embeddings=cast(List[Sequence[float]], [centroid_vec]), n_results=8, include=["documents", "metadatas", "distances"]) or {}
                             ids = (q.get("ids") or [[]])[0]
                             docs = (q.get("documents") or [[]])[0]
                             dists = (q.get("distances") or [[]])[0]
@@ -144,7 +144,7 @@ async def run_cluster_enricher() -> None:
                     retrieved: List[Dict[str, Any]] = []
                     lcoll = _get_provider().get_or_create_collection(_logs_collection_name(os_name))
                     try:
-                        res = lcoll.get(where={"cluster_id": cluster_id}, include=["documents", "metadatas"], limit=30) or {}
+                        res = cast(Dict[str, Any], lcoll.get(where={"cluster_id": cluster_id}, include=["documents", "metadatas"], limit=30)) or {}
                     except Exception:
                         res = {}
                     ids = list(res.get("ids") or [])

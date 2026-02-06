@@ -35,7 +35,7 @@ async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, 
 
     # Fetch persisted ids once
     try:
-        persisted_ids = await redis.smembers(settings.ALERTS_PERSISTED_SET)
+        persisted_ids = await redis.smembers(settings.ALERTS_PERSISTED_SET)  # type: ignore[misc]
     except Exception:
         persisted_ids = set()
 
@@ -125,10 +125,10 @@ async def persist_alert(entry_id: str) -> Dict[str, Any]:
             raise HTTPException(status_code=404, detail="alert not found")
         _, fields = entries[0]
         to_store = {**fields, "id": entry_id}
-        await redis.hset(key, mapping=to_store)
+        await redis.hset(key, mapping=to_store)  # type: ignore[misc]
     # Remove TTL and mark persisted
-    await redis.persist(key)  # type: ignore[misc]
-    await redis.sadd(settings.ALERTS_PERSISTED_SET, entry_id)  # type: ignore[misc]
+    await redis.persist(key)  # type: ignore[misc, arg-type]
+    await redis.sadd(settings.ALERTS_PERSISTED_SET, entry_id)  # type: ignore[misc, arg-type]
     return {"status": "ok", "id": entry_id}
 
 

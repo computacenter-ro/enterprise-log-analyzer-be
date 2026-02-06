@@ -60,11 +60,13 @@ Return JSON array format: ["query1", "query2", "query3"]"""
                 ],
                 format="json",
             )
-            content = (resp or {}).get("message", {}).get("content", "[]")
+            resp_dict: Dict[str, Any] = dict(resp) if resp else {}
+            msg_dict: Dict[str, Any] = resp_dict.get("message") or {}
+            content = str(msg_dict.get("content") or "[]")
             result = json.loads(content)
         else:
-            client = _get_client()
-            response = client.chat.completions.create(
+            openai_client = _get_client()
+            response = openai_client.chat.completions.create(
                 model=settings.OPENAI_CHAT_MODEL,
                 response_format={"type": "json_object"},
                 messages=[
@@ -160,11 +162,13 @@ Analyze and return JSON:
                 ],
                 format="json",
             )
-            text = (resp or {}).get("message", {}).get("content", "{}")
+            resp_dict2: Dict[str, Any] = dict(resp) if resp else {}
+            msg_dict2: Dict[str, Any] = resp_dict2.get("message") or {}
+            text = str(msg_dict2.get("content") or "{}")
             return json.loads(text)
         else:
-            client = _get_client()
-            response = client.chat.completions.create(
+            openai_client = _get_client()
+            response = openai_client.chat.completions.create(
                 model=settings.OPENAI_CHAT_MODEL,
                 response_format={"type": "json_object"},
                 messages=[
@@ -334,10 +338,12 @@ Keep it concise, technical, and actionable."""
                     {"role": "user", "content": prompt},
                 ],
             )
-            return (resp or {}).get("message", {}).get("content", "Monitor these systems closely and follow the recommended actions above.")
+            resp_dict3: Dict[str, Any] = dict(resp) if resp else {}
+            msg_dict3: Dict[str, Any] = resp_dict3.get("message") or {}
+            return str(msg_dict3.get("content") or "Monitor these systems closely and follow the recommended actions above.")
         else:
-            client = _get_client()
-            response = client.chat.completions.create(
+            openai_client = _get_client()
+            response = openai_client.chat.completions.create(
                 model=settings.OPENAI_CHAT_MODEL,
                 messages=[
                     {"role": "system", "content": system},
@@ -475,9 +481,12 @@ def _search_vector_db(queries: List[str], os_list: Optional[List[str]] = None, l
                         )
                         
                         if search_results and search_results.get("documents"):
-                            for i, doc in enumerate(search_results["documents"][0]):
-                                distance = search_results["distances"][0][i] if search_results.get("distances") else 1.0
-                                metadata = search_results["metadatas"][0][i] if search_results.get("metadatas") else {}
+                            docs_list = search_results.get("documents") or [[]]
+                            dists_list = search_results.get("distances") or [[]]
+                            metas_list = search_results.get("metadatas") or [[]]
+                            for i, doc in enumerate(docs_list[0]):
+                                distance = dists_list[0][i] if dists_list and len(dists_list) > 0 and len(dists_list[0]) > i else 1.0
+                                metadata = metas_list[0][i] if metas_list and len(metas_list) > 0 and len(metas_list[0]) > i else {}
                                 
                                 results.append({
                                     "type": "log_template",
@@ -494,7 +503,7 @@ def _search_vector_db(queries: List[str], os_list: Optional[List[str]] = None, l
                 continue
         
         # Sort by distance (lower is better) and deduplicate
-        results.sort(key=lambda x: x.get("distance", 1.0))
+        results.sort(key=lambda x: float(x.get("distance", 1.0)))  # type: ignore[arg-type]
         
         # Simple deduplication by document content
         seen = set()
@@ -558,10 +567,12 @@ Provide a helpful, concise answer based on the context above. If you can give sp
                     {"role": "user", "content": user_prompt},
                 ],
             )
-            return (resp or {}).get("message", {}).get("content", "I couldn't generate a response at this time.")
+            resp_dict4: Dict[str, Any] = dict(resp) if resp else {}
+            msg_dict4: Dict[str, Any] = resp_dict4.get("message") or {}
+            return str(msg_dict4.get("content") or "I couldn't generate a response at this time.")
         else:
-            client = _get_client()
-            response = client.chat.completions.create(
+            openai_client4 = _get_client()
+            response = openai_client4.chat.completions.create(
                 model=settings.OPENAI_CHAT_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -636,10 +647,12 @@ Environment Context:
                     {"role": "user", "content": user_prompt},
                 ],
             )
-            return (resp or {}).get("message", {}).get("content", "I couldn't generate a response at this time.")
+            resp_dict5: Dict[str, Any] = dict(resp) if resp else {}
+            msg_dict5: Dict[str, Any] = resp_dict5.get("message") or {}
+            return str(msg_dict5.get("content") or "I couldn't generate a response at this time.")
         else:
-            client = _get_client()
-            response = client.chat.completions.create(
+            openai_client5 = _get_client()
+            response = openai_client5.chat.completions.create(
                 model=settings.OPENAI_CHAT_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},

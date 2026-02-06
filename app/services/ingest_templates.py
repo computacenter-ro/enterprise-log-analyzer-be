@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 import logging
-from typing import Tuple
+from typing import Any, Mapping, Tuple, cast
 
 from app.services.chroma_service import ChromaClientProvider, collection_name_for_os
 
@@ -34,7 +34,8 @@ def ingest_csv_to_collection(os_name: str, csv_path: Path, provider: ChromaClien
         return 0
 
     # Upsert templates with metadata
-    metadatas = [{"os": os_name, "source": str(csv_path), "event_id": ids[i]} for i in range(len(ids))]
+    metadatas_raw = [{"os": os_name, "source": str(csv_path), "event_id": ids[i]} for i in range(len(ids))]
+    metadatas = cast(list[Mapping[str, Any]], metadatas_raw)
     try:
         collection.upsert(ids=ids, documents=texts, metadatas=metadatas)
     except Exception:

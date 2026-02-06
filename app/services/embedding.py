@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, List
+from typing import Any, Dict, Iterable, List
 import logging
 import time
 
@@ -48,11 +48,11 @@ class LogBERTEmbeddingFunction:
 
     @staticmethod
     def _has_meta_tensors(model: torch.nn.Module) -> bool:
-        for tensor in model.parameters():
-            if tensor.device.type == "meta":
+        for param in model.parameters():
+            if param.device.type == "meta":  # type: ignore[union-attr]
                 return True
-        for tensor in model.buffers():
-            if tensor.device.type == "meta":
+        for buf in model.buffers():
+            if buf.device.type == "meta":  # type: ignore[union-attr]
                 return True
         return False
 
@@ -331,7 +331,9 @@ class OllamaEmbeddingFunction:
         try:
             info = self.client.list()
             if key not in OllamaEmbeddingFunction._logged_ready_keys:
-                num_models = len((info or {}).get("models", []))
+                info_dict: Dict[str, Any] = dict(info) if info else {}
+                models_list: List[Any] = info_dict.get("models") or []
+                num_models = len(models_list)
                 logger.info("ollama embedding provider ready host=%s model=%s models=%d", base_url, model, num_models)
                 OllamaEmbeddingFunction._logged_ready_keys.add(key)
             else:
