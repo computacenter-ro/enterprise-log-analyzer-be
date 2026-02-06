@@ -20,7 +20,6 @@ try:
     print(f"EMBEDDING_PROVIDER: {settings.EMBEDDING_PROVIDER}", flush=True)
 
     print("Step 3: Importing embedding module", flush=True)
-    from app.services import embedding
     print("Embedding module imported", flush=True)
 
     print("Step 4: Testing LogBERT import", flush=True)

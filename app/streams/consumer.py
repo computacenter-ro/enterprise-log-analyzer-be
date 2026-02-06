@@ -150,12 +150,7 @@ async def consume_logs():
                                 )
                                 points = []
                             if points:
-                                try:
-                                    LOG.info("consumer: normalized metrics kind=%s points=%d", kind, len(points))
-                                except Exception as e_xadd:
-                                    logging.getLogger("app.kaboom").info(
-                                        "metrics_xadd_failed kind=%s err=%s name=%s", kind, e_xadd, mp.get("name")
-                                    )
+                                LOG.info("consumer: normalized metrics kind=%s points=%d", kind, len(points))
                                 # Export to OTEL if enabled
                                 export_metrics(points)
                                 # Also write to Redis metrics stream for internal uses
@@ -269,10 +264,10 @@ async def consume_logs():
                                                     "nearest_distance": "",
                                                     "nearest_label": "",
                                                 })
-                                except Exception as e_pub:
+                                except Exception as e_build:
                                     logging.getLogger("app.kaboom").info(
-                                        "norm_candidate_publish_failed kind=%s err=%s summary_len=%s",
-                                        kind, e_pub, len((c.get("templated") or c.get("raw") or "")),
+                                        "norm_candidate_build_failed kind=%s err=%s",
+                                        kind, e_build,
                                     )
                                 # Publish any generated candidates immediately to issues stream
                                 try:

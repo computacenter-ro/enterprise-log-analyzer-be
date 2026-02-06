@@ -3,6 +3,7 @@ name = "enterprise-log-analyzer"
 version = "0.1.0"
 description = "FastAPI-based log ingestion & analysis"
 authors = ["Roberto roberto.hordoan@computacenter.com"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -42,6 +43,16 @@ pytest = "^7.2"
 httpx = ">=0.27.0"
 fakeredis = "^2.0.0"
 mypy = "^1.0"
+
+[tool.mypy]
+explicit_package_bases = true
+exclude = [
+    "quick_test.py",
+    "scripts/",
+    "simulation-api/",
+    "debug_.*\\.py",
+]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

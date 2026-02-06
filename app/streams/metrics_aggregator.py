@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List
 
 import redis.asyncio as aioredis
@@ -40,9 +40,8 @@ async def aggregate_cluster_stats(os_name: str) -> Dict[str, Any]:
         collection = provider.get_or_create_collection(_proto_collection_name(os_name))
         
         # Get all prototypes
-        data = collection.get(include=["metadatas", "embeddings"]) or {}
+        data = collection.get(include=["metadatas"]) or {}
         metas = data.get("metadatas", [])
-        embeddings = data.get("embeddings", [])
         
         if not metas:
             return {

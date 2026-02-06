@@ -161,8 +161,8 @@ Write {num_queries} short search queries (max 12 words each) that would retrieve
 def classify_issue(os_name: str, top_logs: List[Dict[str, Any]], neighbors: List[Dict[str, Any]], retrieved_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """LLM-based classification for an aggregated issue."""
     examples = "\n".join([f"- {n.get('document', '')}" for n in neighbors[:8]])
-    recent = "\n".join([f"- {l.get('templated','')}" for l in top_logs[:50]])
-    extra = "\n".join([f"- {l.get('templated','')}" for l in retrieved_logs[:20]])
+    recent = "\n".join([f"- {log.get('templated','')}" for log in top_logs[:50]])
+    extra = "\n".join([f"- {log.get('templated','')}" for log in retrieved_logs[:20]])
     # Expanded failure type taxonomy (keep aligned with classify_failure)
     failure_types = "|".join([
         "disk", "storage", "raid", "nvme", "filesystem", "io",
@@ -202,7 +202,7 @@ Only JSON; no extra text.
 def classify_cluster(os_name: str, cluster_id: str, medoid_doc: str, neighbors: List[Dict[str, Any]], retrieved_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
     """LLM-based classification for a cluster (prototype) with cluster-scoped context."""
     examples = "\n".join([f"- {n.get('document','')}" for n in neighbors[:8]])
-    recent = "\n".join([f"- {l.get('templated','')}" for l in retrieved_logs[:50]])
+    recent = "\n".join([f"- {log.get('templated','')}" for log in retrieved_logs[:50]])
     failure_types = "|".join([
         "disk", "storage", "raid", "nvme", "filesystem", "io",
         "cpu", "memory", "network", "power", "thermal", "wifi",

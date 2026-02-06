@@ -135,8 +135,8 @@ def _label_cluster(documents: List[str]) -> Tuple[str, str]:
     if labels:
         # majority vote
         counts: Dict[str, int] = {}
-        for l in labels:
-            counts[l] = counts.get(l, 0) + 1
+        for label in labels:
+            counts[label] = counts.get(label, 0) + 1
         majority = max(counts.items(), key=lambda kv: kv[1])[0]
         return majority, "keyword_rules"
     return "unknown", "no_signal"

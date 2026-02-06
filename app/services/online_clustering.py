@@ -181,7 +181,7 @@ def _record_online_metrics(os_name: str, cluster_id: str, distance: float, is_ne
         
         # Create a new event loop just for this operation to avoid conflicts
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()  # Check if loop exists
             # If there's a running loop, use asyncio.run_coroutine_threadsafe
             import threading
             

@@ -167,7 +167,7 @@ async def ingest_telegraf(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing telegraf token")
 
     # Load telegraf agents and find match by token (and optional agent_id)
-    res = await db.execute(select(DataSource).where(DataSource.type == "telegraf", DataSource.enabled == True))
+    res = await db.execute(select(DataSource).where(DataSource.type == "telegraf", DataSource.enabled.is_(True)))
     agents = [row for row in res.scalars().all()]
     matched: DataSource | None = None
     for a in agents:

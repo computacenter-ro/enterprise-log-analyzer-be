@@ -135,7 +135,7 @@ async def run_cluster_enricher() -> None:
 
                     # HYDE queries using medoid (kept for future use), but retrieval will not use query()
                     seed_logs = [{"templated": medoid_doc}] if medoid_doc else []
-                    queries = generate_hypothesis(os_name, medoid_doc, seed_logs, num_queries=3)
+                    _queries = generate_hypothesis(os_name, medoid_doc, seed_logs, num_queries=3)  # noqa: F841
 
                     # retrieve logs within same cluster via where filter (use get instead of query to avoid vector/text requirement)
                     retrieved: List[Dict[str, Any]] = []

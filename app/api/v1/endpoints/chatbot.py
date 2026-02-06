@@ -7,7 +7,7 @@ import redis.asyncio as aioredis
 
 from app.core.config import get_settings
 from app.services.chroma_service import ChromaClientProvider, collection_name_for_os
-from app.services.llm_service import _get_client, _get_ollama, SYSTEM
+from app.services.llm_service import _get_client, _get_ollama
 from app.api.v1.endpoints.alerts import list_alerts as list_alerts_endpoint
 
 settings = get_settings()
@@ -212,7 +212,7 @@ async def _tool_search_alerts(params: Dict[str, Any]) -> Dict[str, Any]:
     items = filtered[:limit]
 
     if not items:
-        msg = f"I couldn't find any alerts matching the requested filters."
+        msg = "I couldn't find any alerts matching the requested filters."
         return {"text": msg, "sources": []}
 
     # Generate technical assistant response with markdown and guidance
@@ -238,7 +238,6 @@ def _generate_alert_guidance(items: List[Dict[str, Any]], severity: str, limit: 
     
     # Header with context
     count = len(items)
-    sev_label = severity.upper() if severity else "ALERT"
     if severity == "critical":
         lines.append(f"## ⚠️ {count} Critical Alert{'s' if count > 1 else ''} Found\n")
         lines.append("**Immediate attention required.** These alerts indicate high-risk conditions that may lead to outages or data loss.\n")
@@ -265,7 +264,7 @@ def _generate_alert_guidance(items: List[Dict[str, Any]], severity: str, limit: 
         lines.append(f"**OS:** {os_name.upper()} | **Type:** `{failure_type}`{conf_pct}\n")
         
         if recommendation:
-            lines.append(f"**Recommended Action:**")
+            lines.append("**Recommended Action:**")
             lines.append(f"> {recommendation}\n")
     
     # Add guidance section for smaller result sets
@@ -570,7 +569,7 @@ Provide a helpful, concise answer based on the context above. If you can give sp
             return response.choices[0].message.content or "I couldn't generate a response at this time."
     except Exception as e:
         LOG.error("Error synthesizing response: %s", e)
-        return f"I found some relevant information but encountered an error generating a response. Please check the sources below."
+        return "I found some relevant information but encountered an error generating a response. Please check the sources below."
 
 
 def _synthesize_context_response(user_query: str, context: Dict[str, Any]) -> str:
@@ -648,7 +647,7 @@ Environment Context:
             return response.choices[0].message.content or "I couldn't generate a response at this time."
     except Exception as e:
         LOG.error("Error synthesizing context response: %s", e)
-        return f"I encountered an error analyzing the environment. Please try again."
+        return "I encountered an error analyzing the environment. Please try again."
 
 
 @router.post("/chat", response_model=ChatResponse)

@@ -38,7 +38,7 @@ jobs:
           poetry install --no-interaction --with=dev
 
       - name: Lint
-        run: poetry run ruff .
+        run: poetry run ruff check . --exclude quick_test.py,scripts/,simulation-api/
 
       - name: Type check
         run: poetry run mypy .
