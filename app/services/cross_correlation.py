@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 import logging
 
@@ -94,7 +94,7 @@ def compute_global_clusters(
         try:
             coll = provider.get_or_create_collection(_logs_collection_name(os_name))
             # Note: 'ids' is not a valid value for 'include'; Chroma always returns ids alongside requested fields.
-            data = coll.get(include=["embeddings", "documents", "metadatas"], limit=2000) or {}
+            data = cast(Dict[str, Any], coll.get(include=["embeddings", "documents", "metadatas"], limit=2000)) or {}
         except Exception as exc:
             LOG.info("correlation: failed to read logs for os=%s err=%s", os_name, exc)
             data = {}
@@ -238,7 +238,7 @@ def compute_global_prototype_clusters_hdbscan(
     for os_name in ("linux", "macos", "windows", "network"):
         try:
             coll = provider.get_or_create_collection(_proto_collection_name(os_name))
-            data = coll.get(include=["embeddings", "documents", "metadatas"]) or {}
+            data = cast(Dict[str, Any], coll.get(include=["embeddings", "documents", "metadatas"])) or {}
         except Exception as exc:
             LOG.info("hdbscan correlation: failed to read prototypes for os=%s err=%s", os_name, exc)
             data = {}
@@ -352,11 +352,11 @@ def compute_global_prototype_clusters_hdbscan(
             try:
                 lcoll = provider.get_or_create_collection(_logs_collection_name(osn))
                 # Use get with where filter; query requires embeddings/documents which we are not providing here
-                q = lcoll.get(
+                q = cast(Dict[str, Any], lcoll.get(
                     where={"cluster_id": proto_id},
                     include=["documents", "metadatas"],
                     limit=int(per_proto_cap),
-                ) or {}
+                )) or {}
             except Exception as exc:
                 LOG.info("hdbscan correlation: logs query failed os=%s proto=%s err=%s", osn, proto_id, exc)
                 q = {}
