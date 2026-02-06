@@ -15,13 +15,15 @@ services:
 
   app:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4}
     volumes:
       - .:/app:ro
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-4}
     depends_on:
       - redis
       - postgres
