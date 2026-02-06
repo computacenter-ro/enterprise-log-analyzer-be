@@ -13,6 +13,16 @@ services:
     ports:
       - "5432:5432"
 
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    volumes:
+      - chroma-data:/chroma/chroma
+
   app:
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4}
@@ -24,9 +34,13 @@ services:
       - .env
     environment:
       - UVICORN_WORKERS=${UVICORN_WORKERS:-4}
+      - CHROMA_MODE=http
+      - CHROMA_SERVER_HOST=chroma
+      - CHROMA_SERVER_PORT=8000
     depends_on:
       - redis
       - postgres
+      - chroma
 
   producer:
     build: .
@@ -35,3 +49,7 @@ services:
       - .:/app:ro
     depends_on:
       - redis
+
+volumes:
+  chroma-data:
+    driver: local
