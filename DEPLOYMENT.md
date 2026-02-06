@@ -81,6 +81,12 @@ OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_CHAT_MODEL=mistral
 ```
 
+Mock API (simulation):
+
+```text
+MOCK_API_URL=http://mock-api:8000
+```
+
 #### 4) Health checks
 
 - Backend: `GET /api/v1/health`
