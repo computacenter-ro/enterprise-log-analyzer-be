@@ -102,7 +102,7 @@ class ChromaClientProvider:
             name=safe_name,
             embedding_function=self.embedding_fn,  # type: ignore[arg-type]
             metadata={
-                "source": "enterprise-log-analyzer",
+                "source": "aiops",
                 "type": "template",
                 "embedding_provider": settings.EMBEDDING_PROVIDER,
                 "embedding_id": embed_id,

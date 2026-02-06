@@ -5,22 +5,22 @@ networks:
 
 volumes:
   chroma_data:
-    name: enterprise-aiops-chroma-data
+    name: aiops-chroma-data
     driver: local
 
 services:
   aiops-backend:
-    image: enterprise-aiops-backend:latest
+    image: aiops-backend:latest
     build:
       context: .
       dockerfile: Dockerfile
       args:
         - BUILDKIT_INLINE_CACHE=1
-    container_name: enterprise-aiops-backend
+    container_name: aiops-backend
     restart: always
     environment:
       # Application
-      PROJECT_NAME: ${PROJECT_NAME:-Enterprise Log Analyzer}
+      PROJECT_NAME: ${PROJECT_NAME:-AI Ops}
       API_PREFIX: ${API_PREFIX:-/api/v1}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DEBUG: ${DEBUG:-False}

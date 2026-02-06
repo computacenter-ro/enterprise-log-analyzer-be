@@ -13,7 +13,7 @@ jobs:
       # Define which services to expose
       services: |
         [
-          {"name": "log-analyzer-backend", "subdomain": "log-analyzer-api", "internal_port": 8000, "expose": true}
+          {"name": "aiops-backend", "subdomain": "log-analyzer-api", "internal_port": 8000, "expose": true}
         ]
 
       domain: 'ccrolabs.com'

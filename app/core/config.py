@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     ENABLE_METRICS_NORMALIZATION: bool = True
     ENABLE_OTEL_EXPORT: bool = False
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4318/v1/metrics"
-    OTEL_SERVICE_NAME: str = "enterprise-log-analyzer"
+    OTEL_SERVICE_NAME: str = "aiops"
     ALERTS_CANDIDATES_STREAM: str = "alerts_candidates"
     ALERTS_STREAM: str = "alerts"
     ALERTS_TTL_SEC: int = 60 * 60 * 24  # 24h

@@ -10,5 +10,5 @@ jobs:
       runs-on: '["self-hosted", "ccro-macstudio-one"]'
       database-names: 'aiops_db'
       database-users: 'aiops_user'
-      database-passwords: '${{ secrets.POSTGRES_PASSWORD }}'
+      database-passwords: ${{ secrets.POSTGRES_PASSWORD }}
     secrets: inherit
