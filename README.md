@@ -79,6 +79,16 @@ Services:
 - `app`: FastAPI `http://localhost:8000` (reload)
 - `producer` (optional): standalone log producer that tails files under `data/`
 
+Notes:
+
+- For stability, run Chroma as a separate HTTP service and set
+  `CHROMA_MODE=http` with `CHROMA_SERVER_HOST`/`CHROMA_SERVER_PORT`.
+  See `DEPLOYMENT.md` for details.
+
+Deployment guide:
+
+- See `DEPLOYMENT.md` for Docker and Kubernetes deployment details.
+
 Use one producer path:
 
 - In-process producer: set `ENABLE_PRODUCER=1` for the `app` service (or see launcher below)

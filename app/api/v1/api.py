@@ -10,6 +10,7 @@ from app.api.v1.endpoints import chatbot
 from app.api.v1.endpoints import cluster_metrics
 from app.api.v1.endpoints import correlation
 from app.api.v1.endpoints import correlation_keys
+from app.api.v1.endpoints import environments
 
 api_router = APIRouter()
 api_router.include_router(items.router, prefix="/items", tags=["items"])
@@ -22,3 +23,4 @@ api_router.include_router(chatbot.router, prefix="/chatbot", tags=["chatbot"])
 api_router.include_router(cluster_metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(correlation.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(correlation_keys.router, prefix="/metrics", tags=["metrics"])
+api_router.include_router(environments.router, prefix="/environments", tags=["environments"])

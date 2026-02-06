@@ -59,6 +59,8 @@ def compute_global_clusters(
     threshold: float | None = None,
     min_size: int | None = None,
     include_logs_per_cluster: int = 20,
+    env_id: str | None = None,
+    max_items_per_os: int = 800,
 ) -> Dict[str, Any]:
     """Cluster logs across all OS collections to find cross-source correlations.
 
@@ -94,7 +96,10 @@ def compute_global_clusters(
         try:
             coll = provider.get_or_create_collection(_logs_collection_name(os_name))
             # Note: 'ids' is not a valid value for 'include'; Chroma always returns ids alongside requested fields.
-            data = cast(Dict[str, Any], coll.get(include=["embeddings", "documents", "metadatas"], limit=2000)) or {}
+            if env_id is not None:
+                data = coll.get(where={"env_id": env_id}, include=["embeddings", "documents", "metadatas"], limit=int(max_items_per_os)) or {}
+            else:
+                data = coll.get(include=["embeddings", "documents", "metadatas"], limit=int(max_items_per_os)) or {}
         except Exception as exc:
             LOG.info("correlation: failed to read logs for os=%s err=%s", os_name, exc)
             data = {}
@@ -111,12 +116,12 @@ def compute_global_clusters(
             by_source.setdefault(src, []).append(i)
         for _, idxs in by_source.items():
             for i in idxs[: max(0, int(limit_per_source))]:
-                ids.append(os_ids[i])
-                docs.append(os_docs[i] if i < len(os_docs) else "")
-                embs.append(os_embs[i] if i < len(os_embs) else [])
                 meta = dict(os_metas[i] or {})
                 if "os" not in meta:
                     meta["os"] = os_name
+                ids.append(os_ids[i])
+                docs.append(os_docs[i] if i < len(os_docs) else "")
+                embs.append(os_embs[i] if i < len(os_embs) else [])
                 metas.append(meta)
 
     if not embs:
@@ -154,6 +159,7 @@ def compute_global_clusters(
                 "os": (meta or {}).get("os", ""),
                 "source": (meta or {}).get("source", ""),
                 "raw": (meta or {}).get("raw", ""),
+                "env_id": (meta or {}).get("env_id", ""),
             })
 
         out_clusters.append({
@@ -172,6 +178,8 @@ def compute_global_clusters(
             "min_size": ms,
             "limit_per_source": limit_per_source,
             "include_logs_per_cluster": include_logs_per_cluster,
+            "env_id": env_id,
+            "max_items_per_os": max_items_per_os,
         },
         "clusters": out_clusters,
     }

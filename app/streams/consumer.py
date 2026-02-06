@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from collections import defaultdict
 from typing import Any, Dict, List
 
@@ -59,6 +60,46 @@ def _os_from_source(source: str | None) -> str:
 
 def _log_collection_name(os_name: str) -> str:
     return f"{settings.CHROMA_LOG_COLLECTION_PREFIX}{os_name or 'unknown'}"
+
+
+def _env_id_from_hostname(val: str | None) -> str | None:
+    if not val or not isinstance(val, str):
+        return None
+    m = re.search(r"(env-[0-9]{3})", val.lower())
+    return m.group(1) if m else None
+
+
+def _derive_env_id(line: str, parsed: Dict[str, str]) -> str | None:
+    # Check parsed fields first
+    for key in ("env_id", "EnvironmentId", "envId"):
+        v = parsed.get(key)
+        if v:
+            return str(v)
+    # Check common host-ish fields
+    for key in ("ComputerName", "computerName", "host", "hostname", "device", "deviceName", "device_name", "name"):
+        v = parsed.get(key)
+        env = _env_id_from_hostname(v)
+        if env:
+            return env
+    # Try JSON parse to look for env_id
+    try:
+        import json as _json
+        obj = _json.loads(line)
+        if isinstance(obj, dict):
+            for key in ("env_id", "EnvironmentId", "envId"):
+                v = obj.get(key)
+                if v:
+                    return str(v)
+            for key in ("ComputerName", "computerName", "host", "hostname", "device", "deviceName", "device_name", "name"):
+                v = obj.get(key)
+                env = _env_id_from_hostname(v if isinstance(v, str) else None)
+                if env:
+                    return env
+    except Exception:
+        pass
+    # Last resort: regex scan in raw line
+    env = _env_id_from_hostname(line)
+    return env
 
 
 def _parse_and_template(os_name: str, line: str) -> tuple[str, Dict[str, str]]:
@@ -410,6 +451,7 @@ async def consume_logs():
                         elif kind in {"redfish"}:
                             os_name = "linux"
                     templated, parsed = _parse_and_template(os_name, line)
+                    env_id = _derive_env_id(line, parsed or {})
 
                     # Choose document text based on embedding mode
                     use_raw = settings.EMBEDDING_PROVIDER.lower() == "logbert" and getattr(settings, "LOGBERT_USE_RAW_LOGS", False)
@@ -419,13 +461,16 @@ async def consume_logs():
                     coll_name = _log_collection_name(os_name)
                     batched[coll_name]["ids"].append(msg_id)
                     batched[coll_name]["documents"].append(doc_text)
-                    batched[coll_name]["metadatas"].append({
+                    metadata_obj: Dict[str, Any] = {
                         "os": os_name,
                         "source": source or "",
                         "raw": line,
                         "embedding_mode": "raw" if use_raw else "templated",
                         **parsed,
-                    })
+                    }
+                    if env_id:
+                        metadata_obj["env_id"] = env_id
+                    batched[coll_name]["metadatas"].append(metadata_obj)
 
                     # quick rule signal
                     rule = match_failure_signals(f"{templated} {line}")

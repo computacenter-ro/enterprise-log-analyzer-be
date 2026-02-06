@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     # Online clustering + cluster classification thresholds
     ONLINE_CLUSTER_DISTANCE_THRESHOLD: float = 0.25
     CLUSTER_MIN_LOGS_FOR_CLASSIFICATION: int = 20
+    # Re-publish cluster candidates for very large clusters (keeps alerts flowing even when a cluster is long-lived)
+    # Set to 0 to disable.
+    CLUSTER_CANDIDATE_REPUBLISH_EVERY: int = 200
+    # Minimum time between re-publishes for the same (os, cluster_id)
+    CLUSTER_CANDIDATE_REPUBLISH_MIN_INTERVAL_SEC: int = 120
 
     # Issue aggregation params
     ISSUE_INACTIVITY_SEC: int = 120  # close issue after N seconds without new logs
@@ -112,6 +117,9 @@ class Settings(BaseSettings):
     LLM_COST_PER_1K_TOKENS: float = 0.0001  # OpenAI pricing for gpt-4o-mini
     # HTTP request logging toggle (middleware). Set to false to suppress request logs
     REQUEST_LOGS_ENABLED: bool = True
+
+    # Simulation / mock upstream (used for env topology demos)
+    MOCK_API_URL: str = "http://localhost:8000"
 
     # Logging configuration (read by logging_config)
     LOG_LEVEL: str = "INFO"

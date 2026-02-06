@@ -65,15 +65,52 @@ def _vector_has_values(vec) -> bool:
         return False
 
 
+def _first_result_list(q: Dict[str, Any], key: str) -> list:
+    """Safely extract the first list from Chroma query results.
+
+    Avoids numpy truthiness issues (e.g. `np.ndarray or [...]`) by never using boolean
+    evaluation on potential numpy arrays.
+    """
+    val = q.get(key)
+    if val is None:
+        return []
+    try:
+        import numpy as np  # type: ignore
+        if isinstance(val, np.ndarray):  # noqa: SIM401
+            val = val.tolist()
+    except Exception:
+        pass
+    if isinstance(val, list):
+        if not val:
+            return []
+        first = val[0]
+        return first if isinstance(first, list) else [first]
+    return []
+
+
 def _get_prototype(os_name: str, cluster_id: str) -> tuple[list[float] | None, str, Dict[str, Any]]:
     collection = _get_provider().get_or_create_collection(_proto_collection_name(os_name))
     data = collection.get(ids=[cluster_id], include=["embeddings", "documents", "metadatas"]) or {}
-    embs = data.get("embeddings") or []
-    docs = data.get("documents") or []
-    metas = data.get("metadatas") or []
-    centroid: list[float] | None = list(embs[0]) if embs else None
-    medoid_doc: str = str(docs[0]) if docs else ""
-    meta: Dict[str, Any] = dict(metas[0]) if metas else {}
+    embs = data.get("embeddings")
+    docs = data.get("documents")
+    metas = data.get("metadatas")
+    try:
+        import numpy as np  # type: ignore
+        if isinstance(embs, np.ndarray):  # noqa: SIM401
+            embs = embs.tolist()
+        if isinstance(docs, np.ndarray):  # noqa: SIM401
+            docs = docs.tolist()
+        if isinstance(metas, np.ndarray):  # noqa: SIM401
+            metas = metas.tolist()
+    except Exception:
+        pass
+    embs_list = embs if isinstance(embs, list) else []
+    docs_list = docs if isinstance(docs, list) else []
+    metas_list = metas if isinstance(metas, list) else []
+
+    centroid = embs_list[0] if len(embs_list) > 0 else None
+    medoid_doc = docs_list[0] if len(docs_list) > 0 else ""
+    meta = metas_list[0] if len(metas_list) > 0 else {}
     return centroid, medoid_doc, meta
 
 
@@ -117,11 +154,11 @@ async def run_cluster_enricher() -> None:
                     if centroid_vec and len(centroid_vec) > 0:
                         try:
                             tcoll = _get_provider().get_or_create_collection(collection_name_for_os(os_name))
-                            q = tcoll.query(query_embeddings=cast(List[Sequence[float]], [centroid_vec]), n_results=8, include=["documents", "metadatas", "distances"]) or {}
-                            ids = (q.get("ids") or [[]])[0]
-                            docs = (q.get("documents") or [[]])[0]
-                            dists = (q.get("distances") or [[]])[0]
-                            metas = (q.get("metadatas") or [[]])[0]
+                            q = tcoll.query(query_embeddings=[centroid_vec], n_results=8, include=["documents", "metadatas", "distances"]) or {}
+                            ids = _first_result_list(q, "ids")
+                            docs = _first_result_list(q, "documents")
+                            dists = _first_result_list(q, "distances")
+                            metas = _first_result_list(q, "metadatas")
                             for i in range(len(ids)):
                                 neighbors.append({
                                     "id": ids[i],
@@ -142,6 +179,7 @@ async def run_cluster_enricher() -> None:
 
                     # retrieve logs within same cluster via where filter (use get instead of query to avoid vector/text requirement)
                     retrieved: List[Dict[str, Any]] = []
+                    env_ids_set: set[str] = set()
                     lcoll = _get_provider().get_or_create_collection(_logs_collection_name(os_name))
                     try:
                         res = cast(Dict[str, Any], lcoll.get(where={"cluster_id": cluster_id}, include=["documents", "metadatas"], limit=30)) or {}
@@ -151,11 +189,48 @@ async def run_cluster_enricher() -> None:
                     docs = list(res.get("documents") or [])
                     metas = list(res.get("metadatas") or [])
                     for i in range(len(ids)):
+                        meta_i = metas[i] if i < len(metas) else {}
+                        env_val = (meta_i or {}).get("env_id")
+                        if env_val:
+                            env_ids_set.add(str(env_val))
                         retrieved.append({
                             "id": ids[i],
                             "templated": docs[i] if i < len(docs) else "",
-                            "raw": (metas[i] or {}).get("raw", ""),
+                            "raw": (meta_i or {}).get("raw", ""),
+                            "source": (meta_i or {}).get("source", ""),
+                            "os": (meta_i or {}).get("os", os_name),
+                            "env_id": env_val,
                         })
+
+                    # Fallback: use sample logs from candidate if Chroma lookup was empty.
+                    if not retrieved:
+                        try:
+                            sample_logs = json.loads(data.get("sample_logs") or "[]")
+                        except Exception:
+                            sample_logs = []
+                        if isinstance(sample_logs, list) and sample_logs:
+                            for s in sample_logs[:10]:
+                                if not isinstance(s, dict):
+                                    continue
+                                env_val = s.get("env_id")
+                                if env_val:
+                                    env_ids_set.add(str(env_val))
+                                retrieved.append({
+                                    "id": s.get("id") or "",
+                                    "templated": s.get("templated") or "",
+                                    "raw": s.get("raw") or "",
+                                    "source": s.get("source") or "",
+                                    "os": s.get("os") or os_name,
+                                    "env_id": env_val,
+                                })
+                    if not env_ids_set:
+                        try:
+                            env_ids_list = json.loads(data.get("env_ids") or "[]")
+                            for env_val in env_ids_list or []:
+                                if env_val:
+                                    env_ids_set.add(str(env_val))
+                        except Exception:
+                            pass
 
                     result = classify_cluster(os_name, cluster_id, medoid_doc, neighbors, retrieved)
                     
@@ -177,13 +252,17 @@ async def run_cluster_enricher() -> None:
                         except Exception:
                             pass  # Don't fail enrichment if metrics fail
                     
-                    payload: Dict[str, str] = {
+                    env_ids_list = list(env_ids_set)
+                    payload = {
                         "type": "cluster",
                         "os": os_name,
                         "cluster_id": cluster_id,
                         "failure_type": result.get("failure_type", ""),
                         "confidence": str(result.get("confidence") or ""),
                         "result": json.dumps(result),
+                        "env_id": env_ids_list[0] if len(env_ids_list) == 1 else "",
+                        "env_ids": json.dumps(env_ids_list),
+                        "evidence_logs": json.dumps(retrieved),
                     }
                     entry_id = await redis.xadd(settings.ALERTS_STREAM, payload)  # type: ignore[arg-type]
                     try:
@@ -207,7 +286,7 @@ async def run_cluster_enricher() -> None:
                     except Exception:
                         pass
                 except Exception as exc:
-                    LOG.info("cluster enricher processing failed id=%s err=%s", msg_id, exc)
+                    LOG.exception("cluster enricher processing failed id=%s err=%s", msg_id, exc)
                     try:
                         import logging as _logging
                         _logging.getLogger("app.kaboom").info(

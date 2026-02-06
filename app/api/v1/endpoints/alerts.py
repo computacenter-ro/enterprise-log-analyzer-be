@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import json
 import time
@@ -27,9 +27,36 @@ def _parse_result(raw: str | None) -> Dict[str, Any]:
             return {"raw": raw}
 
 
+def _parse_env_ids(raw: str | None) -> List[str]:
+    if not raw:
+        return []
+    try:
+        val = json.loads(raw)
+        if isinstance(val, list):
+            return [str(x) for x in val if x is not None]
+    except Exception:
+        pass
+    return []
+
+
+def _parse_logs(raw: str | None) -> List[Dict[str, Any]]:
+    if not raw:
+        return []
+    try:
+        val = json.loads(raw)
+        if isinstance(val, list):
+            return val
+    except Exception:
+        return []
+    return []
+
+
 @router.get("")
-async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, Any]]:
-    """List alerts from the last ALERTS_TTL_SEC and include any persisted ones."""
+async def list_alerts(
+    limit: int = Query(100, ge=1, le=1000),
+    env_id: Optional[str] = Query(None, description="Filter alerts to a specific environment id (or leave empty for all)"),
+) -> List[Dict[str, Any]]:
+    """List alerts from the last ALERTS_TTL_SEC and include any persisted ones. Includes evidence logs and env metadata."""
     now_ms = int(time.time() * 1000)
     min_id = f"{now_ms - (int(settings.ALERTS_TTL_SEC) * 1000)}-0"
 
@@ -60,6 +87,8 @@ async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, 
             # Prefer hash data if available (more complete), fallback to stream fields
             if hash_data:
                 result_obj = _parse_result(hash_data.get("result"))
+                env_ids = _parse_env_ids(hash_data.get("env_ids"))
+                evidence_logs = _parse_logs(hash_data.get("evidence_logs"))
                 out.append({
                     "id": entry_id,
                     "type": hash_data.get("type", ""),
@@ -69,10 +98,16 @@ async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, 
                     "solution": hash_data.get("solution") or result_obj.get("recommendation", ""),
                     "result": result_obj,
                     "persisted": (entry_id in persisted_ids),
+                    "env_id": hash_data.get("env_id") or (env_ids[0] if len(env_ids) == 1 else None),
+                    "env_ids": env_ids,
+                    "logs": evidence_logs,
+                    "cluster_id": hash_data.get("cluster_id", ""),
                 })
             else:
                 # Fallback to stream data if hash doesn't exist
                 result_obj = _parse_result(stream_fields.get("result"))
+                env_ids = _parse_env_ids(stream_fields.get("env_ids"))
+                evidence_logs = _parse_logs(stream_fields.get("evidence_logs"))
                 out.append({
                     "id": entry_id,
                     "type": stream_fields.get("type", ""),
@@ -82,6 +117,10 @@ async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, 
                     "solution": stream_fields.get("solution") or result_obj.get("recommendation", ""),
                     "result": result_obj,
                     "persisted": (entry_id in persisted_ids),
+                    "env_id": stream_fields.get("env_id") or (env_ids[0] if len(env_ids) == 1 else None),
+                    "env_ids": env_ids,
+                    "logs": evidence_logs,
+                    "cluster_id": stream_fields.get("cluster_id", ""),
                 })
 
     # If we still need more, include older persisted alerts (outside TTL)
@@ -99,6 +138,8 @@ async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, 
                 if not data:
                     continue
                 result_obj = _parse_result(data.get("result"))
+                env_ids = _parse_env_ids(data.get("env_ids"))
+                evidence_logs = _parse_logs(data.get("evidence_logs"))
                 out.append({
                     "id": pid,
                     "type": data.get("type", ""),
@@ -106,10 +147,17 @@ async def list_alerts(limit: int = Query(100, ge=1, le=1000)) -> List[Dict[str, 
                     "issue_key": data.get("issue_key", ""),
                     "result": result_obj,
                     "persisted": True,
+                    "env_id": data.get("env_id") or (env_ids[0] if len(env_ids) == 1 else None),
+                    "env_ids": env_ids,
+                    "logs": evidence_logs,
+                    "cluster_id": data.get("cluster_id", ""),
                 })
 
     # Sort by id (time component) desc and cap to limit
     out.sort(key=lambda a: a.get("id", ""), reverse=True)
+    # Filter by env_id if provided
+    if env_id:
+        out = [a for a in out if env_id in (a.get("env_ids") or []) or a.get("env_id") == env_id]
     return out[:limit]
 
 

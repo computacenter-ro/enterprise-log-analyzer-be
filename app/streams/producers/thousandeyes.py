@@ -29,7 +29,7 @@ class ThousandEyes(ProducerPlugin):
         self.window = cfg.get("window") or "5m"
         self.poll_interval_sec: int = int(cfg.get("poll_interval_sec") or 15)
         self.verify_ssl: bool = bool(cfg.get("verify_ssl", True))
-        self.os_hint: str = (cfg.get("os") or "unknown").lower()
+        self.os_hint: str = (cfg.get("os") or "network").lower()
 
         # Auth: prefer Bearer token; fallback to X-TE-Auth-Token header if provided
         self.bearer_token: Optional[str] = cfg.get("bearer_token")
@@ -59,7 +59,11 @@ class ThousandEyes(ProducerPlugin):
             for a in alerts:
                 try:
                     source = f"thousandeyes:{self.os_hint}"
-                    await safe_xadd(STREAM_NAME, {"source": source, "line": __import__("json").dumps({"type": "alert", **a})})
+                    payload = dict(a)
+                    if "type" in payload and payload.get("type") != "alert":
+                        payload["alertType"] = payload.get("type")
+                    payload["type"] = "alert"
+                    await safe_xadd(STREAM_NAME, {"source": source, "line": __import__("json").dumps(payload)})
                     count += 1
                 except Exception as exc:  # noqa: BLE001
                     LOG.info("thousandeyes: failed to emit alert err=%s", exc)
@@ -73,7 +77,11 @@ class ThousandEyes(ProducerPlugin):
                 for t in tests:
                     try:
                         source = f"thousandeyes:{self.os_hint}"
-                        await safe_xadd(STREAM_NAME, {"source": source, "line": __import__("json").dumps({"type": "test", **t})})
+                        payload = dict(t)
+                        if "type" in payload and payload.get("type") != "test":
+                            payload["testType"] = payload.get("type")
+                        payload["type"] = "test"
+                        await safe_xadd(STREAM_NAME, {"source": source, "line": __import__("json").dumps(payload)})
                         count += 1
                     except Exception as exc:  # noqa: BLE001
                         LOG.info("thousandeyes: failed to emit test err=%s", exc)

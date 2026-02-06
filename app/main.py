@@ -142,33 +142,37 @@ async def _log_llm_configuration():
     except Exception:
         pass
 
-attach_consumer(app)
-LOG.info("consumer attachment registered")
-attach_issues_aggregator(app)
-LOG.info("issues aggregator attachment registered")
+if settings.ENABLE_PRODUCER:
+    attach_consumer(app)
+    LOG.info("consumer attachment registered")
+    attach_issues_aggregator(app)
+    LOG.info("issues aggregator attachment registered")
 
-# Start modular producers based on DB-configured sources
-attach_producers(app)
-LOG.info("modular producers attachment registered")
+if settings.ENABLE_PRODUCER:
+    # Start modular producers based on DB-configured sources
+    attach_producers(app)
+    LOG.info("modular producers attachment registered")
 
-# Optionally start the enricher when ENABLE_ENRICHER is true
-if settings.ENABLE_ENRICHER:
-    attach_enricher(app)
-    LOG.info("enricher attachment registered (ENABLE_ENRICHER=%s)", settings.ENABLE_ENRICHER)
+    # Optionally start the enricher when ENABLE_ENRICHER is true
+    if settings.ENABLE_ENRICHER:
+        attach_enricher(app)
+        LOG.info("enricher attachment registered (ENABLE_ENRICHER=%s)", settings.ENABLE_ENRICHER)
 
-# Optionally start the cluster enricher when ENABLE_CLUSTER_ENRICHER is true
-attach_cluster_enricher(app)
+    # Optionally start the cluster enricher when ENABLE_CLUSTER_ENRICHER is true
+    attach_cluster_enricher(app)
 
-attach_prototype_improver(app)
+    attach_prototype_improver(app)
 
-# Optionally start automations when ENABLE_AUTOMATIONS is true
-if settings.ENABLE_AUTOMATIONS:
-    attach_automations(app)
-    LOG.info("automations attachment registered (ENABLE_AUTOMATIONS=%s)", settings.ENABLE_AUTOMATIONS)
+    # Optionally start automations when ENABLE_AUTOMATIONS is true
+    if settings.ENABLE_AUTOMATIONS:
+        attach_automations(app)
+        LOG.info("automations attachment registered (ENABLE_AUTOMATIONS=%s)", settings.ENABLE_AUTOMATIONS)
 
-# Attach metrics aggregator for cluster observability
-attach_metrics_aggregator(app)
-LOG.info("metrics aggregator attachment registered (ENABLE_CLUSTER_METRICS=%s)", settings.ENABLE_CLUSTER_METRICS)
+    # Attach metrics aggregator for cluster observability
+    attach_metrics_aggregator(app)
+    LOG.info("metrics aggregator attachment registered (ENABLE_CLUSTER_METRICS=%s)", settings.ENABLE_CLUSTER_METRICS)
+else:
+    LOG.info("background workers disabled (ENABLE_PRODUCER=False); API-only mode")
 
 # Mount versioned API router
 app.include_router(api_router, prefix=settings.API_PREFIX)
