@@ -10,8 +10,35 @@ volumes:
   postgres_data:
     name: aiops-postgres-data
     driver: local
+  redis_data:
+    name: aiops-redis-data
+    driver: local
 
 services:
+  aiops-redis:
+    image: redis:7-alpine
+    container_name: aiops-redis
+    restart: always
+    ports:
+      - "8053:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aiops-network
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '10'
+
   aiops-postgres:
     image: postgres:16
     container_name: aiops-postgres
@@ -51,6 +78,8 @@ services:
     depends_on:
       aiops-postgres:
         condition: service_healthy
+      aiops-redis:
+        condition: service_healthy
     environment:
       # Application
       PROJECT_NAME: ${PROJECT_NAME:-AI Ops}
@@ -67,7 +96,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aiops_user}:${POSTGRES_PASSWORD}@aiops-postgres:5432/${POSTGRES_DB:-aiops_db}
 
       # Redis
-      REDIS_URL: ${REDIS_URL:-redis://redis_shared:6379/0}
+      REDIS_URL: redis://aiops-redis:6379/0
 
       # Chroma
       CHROMA_MODE: ${CHROMA_MODE:-local}
