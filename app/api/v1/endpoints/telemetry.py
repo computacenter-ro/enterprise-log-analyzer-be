@@ -150,8 +150,8 @@ class TelegrafBatch(BaseModel):
 @router.post("/telegraf")
 async def ingest_telegraf(
     batch: TelegrafBatch,
-    x_telegraf_token: str | None = Header(default=None, convert_underscores=False),
-    x_agent_id: str | None = Header(default=None, convert_underscores=False),
+    x_telegraf_token: str | None = Header(default=None),
+    x_agent_id: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Accept Telegraf metrics and enqueue them to the central logs stream.
