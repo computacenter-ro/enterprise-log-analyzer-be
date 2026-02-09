@@ -207,12 +207,13 @@ async def ingest_telegraf(
             if isinstance(val, str) and val:
                 msg = val
 
-        if name in {"macos_log", "linux_log", "windows_log"} and msg:
+        if name in {"macos_log", "linux_log", "windows_log", "docker_log"} and msg:
             # Map to existing OS file names so consumer routes correctly by substring
             source_map = {
                 "macos_log": "Mac.log:telegraf",
                 "linux_log": "Linux.log:telegraf",
                 "windows_log": "Windows_2k.log:telegraf",
+                "docker_log": "Mac.log:telegraf:docker",
             }
             source = source_map.get(name, "Mac.log:telegraf")
             await redis.xadd("logs", {"source": source, "line": msg, "source_id": str(matched.id)})
