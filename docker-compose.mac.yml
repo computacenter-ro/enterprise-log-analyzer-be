@@ -7,8 +7,38 @@ volumes:
   chroma_data:
     name: aiops-chroma-data
     driver: local
+  postgres_data:
+    name: aiops-postgres-data
+    driver: local
 
 services:
+  aiops-postgres:
+    image: postgres:16
+    container_name: aiops-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aiops_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-aiops_db}
+    ports:
+      - "8052:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - aiops-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-aiops_user} -d ${POSTGRES_DB:-aiops_db}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '10'
+
   aiops-backend:
     image: aiops-backend:latest
     build:
@@ -18,6 +48,9 @@ services:
         - BUILDKIT_INLINE_CACHE=1
     container_name: aiops-backend
     restart: always
+    depends_on:
+      aiops-postgres:
+        condition: service_healthy
     environment:
       # Application
       PROJECT_NAME: ${PROJECT_NAME:-AI Ops}
@@ -26,12 +59,12 @@ services:
       DEBUG: ${DEBUG:-False}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
-      # Database (connects to shared PostgreSQL instance)
-      POSTGRES_SERVER: ${POSTGRES_SERVER:-postgres_shared}
+      # Database
+      POSTGRES_SERVER: aiops-postgres
       POSTGRES_USER: ${POSTGRES_USER:-aiops_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-aiops_db}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aiops_user}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER:-postgres_shared}:5432/${POSTGRES_DB:-aiops_db}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aiops_user}:${POSTGRES_PASSWORD}@aiops-postgres:5432/${POSTGRES_DB:-aiops_db}
 
       # Redis
       REDIS_URL: ${REDIS_URL:-redis://redis_shared:6379/0}
@@ -76,7 +109,7 @@ services:
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
     ports:
-      - "8012:8000"
+      - "8051:8000"
     volumes:
       - chroma_data:/app/.chroma
     networks:

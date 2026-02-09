@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 from fastapi import FastAPI, Header, Request, Response, Body
+from pydantic import BaseModel
 from faker import Faker
 import httpx
 
