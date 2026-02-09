@@ -9,7 +9,7 @@ MOCK_HOST="${MOCK_HOST:-127.0.0.1}"
 MOCK_PORT="${MOCK_PORT:-8086}"
 
 echo "Starting main API: ${APP_MODULE} on ${APP_HOST}:${APP_PORT}"
-: "${UVICORN_WORKERS:=4}"
+: "${UVICORN_WORKERS:=1}"
 uvicorn "${APP_MODULE}" --host "${APP_HOST}" --port "${APP_PORT}" --workers "${UVICORN_WORKERS}" &
 MAIN_PID=$!
 

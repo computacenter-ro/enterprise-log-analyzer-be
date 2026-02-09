@@ -17,6 +17,15 @@ settings = get_settings()
 redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 LOG = logging.getLogger(__name__)
 
+_aggregator_provider: ChromaClientProvider | None = None
+
+
+def _get_aggregator_provider() -> ChromaClientProvider:
+    global _aggregator_provider
+    if _aggregator_provider is None:
+        _aggregator_provider = ChromaClientProvider()
+    return _aggregator_provider
+
 
 def _suffix_for_os(os_name: str) -> str:
     key = (os_name or "").strip().lower()
@@ -36,7 +45,7 @@ def _proto_collection_name(os_name: str) -> str:
 async def aggregate_cluster_stats(os_name: str) -> Dict[str, Any]:
     """Aggregate statistics about current clusters for an OS."""
     try:
-        provider = ChromaClientProvider()
+        provider = _get_aggregator_provider()
         collection = provider.get_or_create_collection(_proto_collection_name(os_name))
         
         # Get all prototypes

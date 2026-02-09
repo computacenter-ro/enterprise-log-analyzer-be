@@ -440,6 +440,11 @@ async def consume_logs():
                         except Exception:
                             pass
 
+                    # Skip log processing for telegraf numeric metrics (cpu, mem, disk, etc.)
+                    # Docker log entries are already remapped to OS-specific sources in telemetry.py
+                    if kind == "telegraf":
+                        continue
+
                     # Infer domain/OS
                     os_name = _os_from_source(source)
                     if os_name == "unknown":
