@@ -208,6 +208,12 @@ async def ingest_telegraf(
                 msg = val
 
         if name in {"macos_log", "linux_log", "windows_log", "docker_log"} and msg:
+            # Skip docker_log entries from infrastructure containers to avoid feedback loops
+            if name == "docker_log":
+                container = str((m.tags or {}).get("container_name") or "")
+                if "aiops" in container or "telegraf" in container:
+                    continue
+
             # Map to existing OS file names so consumer routes correctly by substring
             source_map = {
                 "macos_log": "Mac.log:telegraf",
