@@ -87,6 +87,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DEBUG: ${DEBUG:-False}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
 
       # Database
       POSTGRES_SERVER: aiops-postgres
@@ -137,6 +138,7 @@ services:
 
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
+      HF_HUB_OFFLINE: 1
     ports:
       - "8051:8000"
     volumes:
