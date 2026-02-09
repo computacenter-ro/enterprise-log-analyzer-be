@@ -138,7 +138,6 @@ services:
 
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
-      HF_HUB_OFFLINE: 1
     ports:
       - "8051:8000"
     volumes:
