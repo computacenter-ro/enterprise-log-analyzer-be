@@ -15,6 +15,15 @@ except Exception:  # pragma: no cover
 
 LOG = logging.getLogger(__name__)
 
+_provider: ChromaClientProvider | None = None
+
+
+def _get_provider() -> ChromaClientProvider:
+    global _provider
+    if _provider is None:
+        _provider = ChromaClientProvider()
+    return _provider
+
 
 def _logs_collection_name(os_name: str) -> str:
     key = (os_name or "").strip().lower()
@@ -84,7 +93,7 @@ def compute_global_clusters(
     thr = threshold if threshold is not None else settings.CLUSTER_DISTANCE_THRESHOLD
     ms = min_size if min_size is not None else settings.CLUSTER_MIN_SIZE
 
-    provider = ChromaClientProvider()
+    provider = _get_provider()
 
     ids: List[str] = []
     docs: List[str] = []
@@ -237,7 +246,7 @@ def compute_global_prototype_clusters_hdbscan(
     if hdbscan is None:
         raise RuntimeError("HDBSCAN is not installed. Please install the 'hdbscan' package.")
     # Load prototypes from all OS
-    provider = ChromaClientProvider()
+    provider = _get_provider()
     raw_ids: List[str] = []
     raw_docs: List[str] = []
     raw_embs: List[List[float]] = []

@@ -17,6 +17,15 @@ from app.services.cluster_metrics import (
 
 router = APIRouter()
 
+_provider: ChromaClientProvider | None = None
+
+
+def _get_provider() -> ChromaClientProvider:
+    global _provider
+    if _provider is None:
+        _provider = ChromaClientProvider()
+    return _provider
+
 
 @router.get("/clusters/{os_name}", response_model=Dict[str, Any])
 async def get_cluster_health(
@@ -130,7 +139,7 @@ async def compute_current_quality(
     Uses current embeddings from templates_<os> and optionally a sample from logs_<os>.
     Returns silhouette score, cohesion, separation, cluster counts and basic stats.
     """
-    provider = ChromaClientProvider()
+    provider = _get_provider()
 
     # Load template embeddings
     tcoll = provider.get_or_create_collection(collection_name_for_os(os_name))

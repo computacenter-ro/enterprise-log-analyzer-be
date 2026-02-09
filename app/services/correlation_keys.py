@@ -11,6 +11,15 @@ from app.services.chroma_service import ChromaClientProvider
 IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 MAC_RE = re.compile(r"\b([0-9A-Fa-f]{2}[-:]){5}([0-9A-Fa-f]{2})\b")
 
+_provider: ChromaClientProvider | None = None
+
+
+def _get_provider() -> ChromaClientProvider:
+    global _provider
+    if _provider is None:
+        _provider = ChromaClientProvider()
+    return _provider
+
 
 def _logs_collection_name(os_name: str) -> str:
     return f"{settings.CHROMA_LOG_COLLECTION_PREFIX}{os_name}"
@@ -64,7 +73,7 @@ def _extract_keys_from_json(obj: Dict[str, Any]) -> Dict[str, str]:
 
 def compute_key_correlation(keys: List[str], limit: int = 2000) -> Dict[str, Any]:
     """Scan recent logs across OS collections, extract given keys, and group events sharing key values."""
-    provider = ChromaClientProvider()
+    provider = _get_provider()
     events: List[Dict[str, Any]] = []
     for os_name in ("linux", "macos", "windows"):
         coll = provider.get_or_create_collection(_logs_collection_name(os_name))

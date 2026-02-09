@@ -14,6 +14,15 @@ from app.services.failure_rules import match_failure_signals
 
 LOG = logging.getLogger(__name__)
 
+_provider: ChromaClientProvider | None = None
+
+
+def _get_provider() -> ChromaClientProvider:
+    global _provider
+    if _provider is None:
+        _provider = ChromaClientProvider()
+    return _provider
+
 
 def _suffix_for_os(os_name: str) -> str:
     key = (os_name or "").strip().lower()
@@ -220,7 +229,7 @@ def cluster_os(
     min_size: int | None = None,
 ) -> Dict[str, Any]:
     """Cluster templates (and optional sample of logs) to build prototypes for an OS."""
-    provider = ChromaClientProvider()
+    provider = _get_provider()
     threshold = threshold if threshold is not None else settings.CLUSTER_DISTANCE_THRESHOLD
     min_size = min_size if min_size is not None else settings.CLUSTER_MIN_SIZE
 

@@ -55,6 +55,13 @@ def nearest_prototype(os_name: str, templated_text: str | object, k: int = 3) ->
     if not sanitized_text:
         return []
     
+    # Skip query if collection is empty — ChromaDB raises errors on empty HNSW index
+    try:
+        if collection.count() == 0:
+            return []
+    except Exception:
+        pass
+
     try:
         result = collection.query(query_texts=[sanitized_text], n_results=max(1, k), include=["distances", "metadatas", "documents"])
         out: List[Dict[str, Any]] = []
@@ -72,7 +79,8 @@ def nearest_prototype(os_name: str, templated_text: str | object, k: int = 3) ->
         return out
     except Exception as e:
         # Handle ChromaDB HNSW index errors gracefully
-        if "Nothing found on disk" in str(e) or "hnsw segment reader" in str(e):
+        err_msg = str(e)
+        if "Nothing found on disk" in err_msg or "hnsw segment reader" in err_msg or "list index out of range" in err_msg:
             # Index is corrupted or empty, return empty list to trigger new cluster creation
             return []
         # Re-raise other exceptions
