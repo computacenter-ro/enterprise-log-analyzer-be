@@ -67,7 +67,7 @@ async def list_incidents(
                 env_id=env_id,
                 max_items_per_os=600,
             ),
-            timeout=12,
+            timeout=30,
         )
         clusters = list(clusters_payload.get("clusters") or [])[: int(limit)]
     except Exception as exc:

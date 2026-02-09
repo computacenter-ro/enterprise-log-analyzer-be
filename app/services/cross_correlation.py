@@ -114,7 +114,8 @@ def compute_global_clusters(
             data = {}
         os_ids: List[str] = list(data.get("ids") or [])
         os_docs: List[str] = list(data.get("documents") or [])
-        os_embs: List[List[float]] = [list(e) for e in (data.get("embeddings") or [])]
+        _raw_embs = data.get("embeddings")
+        os_embs: List[List[float]] = [list(e) for e in _raw_embs] if _raw_embs is not None else []
         os_metas_raw = data.get("metadatas") or []
         os_metas: List[Dict[str, Any]] = [dict(m) if m else {} for m in os_metas_raw]
 
@@ -261,7 +262,8 @@ def compute_global_prototype_clusters_hdbscan(
             data = {}
         ids0: List[str] = list(data.get("ids") or [])
         docs0: List[str] = list(data.get("documents") or [])
-        embs0: List[List[float]] = [list(e) for e in (data.get("embeddings") or [])]
+        _raw_embs0 = data.get("embeddings")
+        embs0: List[List[float]] = [list(e) for e in _raw_embs0] if _raw_embs0 is not None else []
         metas_raw = data.get("metadatas") or []
         metas0: List[Dict[str, Any]] = [dict(m) if m else {} for m in metas_raw]
         # Annotate os if missing

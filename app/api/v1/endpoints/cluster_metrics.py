@@ -144,14 +144,16 @@ async def compute_current_quality(
     # Load template embeddings
     tcoll = provider.get_or_create_collection(collection_name_for_os(os_name))
     t_data = tcoll.get(include=["embeddings", "documents"]) or {}
-    t_embs: List[List[float]] = [list(e) for e in (t_data.get("embeddings") or [])]
+    _raw_t = t_data.get("embeddings")
+    t_embs: List[List[float]] = [list(e) for e in _raw_t] if _raw_t is not None else []
 
     # Optionally include a sample of logs embeddings
     if include_logs_samples and include_logs_samples > 0:
         lcoll_name = f"{settings.CHROMA_LOG_COLLECTION_PREFIX}{os_name}"
         lcoll = provider.get_or_create_collection(lcoll_name)
         l_data = lcoll.get(include=["embeddings"], limit=int(include_logs_samples)) or {}
-        t_embs.extend([list(e) for e in (l_data.get("embeddings") or [])])
+        _raw_l = l_data.get("embeddings")
+        t_embs.extend([list(e) for e in _raw_l] if _raw_l is not None else [])
 
     if not t_embs:
         return {

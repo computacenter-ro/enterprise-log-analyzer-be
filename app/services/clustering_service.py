@@ -238,7 +238,8 @@ def cluster_os(
     t_data = templates.get(include=["embeddings", "documents", "metadatas"]) or {}
     t_ids = t_data.get("ids") or []
     t_docs = t_data.get("documents") or []
-    t_embs = t_data.get("embeddings") or []
+    _raw_t_embs = t_data.get("embeddings")
+    t_embs = _raw_t_embs if _raw_t_embs is not None else []
 
     ids: List[str] = list(t_ids)
     docs: List[str] = list(t_docs)
@@ -250,7 +251,8 @@ def cluster_os(
         l_data = logs.get(include=["embeddings", "documents", "metadatas"], limit=int(include_logs_samples)) or {}
         ids.extend(l_data.get("ids") or [])
         docs.extend(l_data.get("documents") or [])
-        embs.extend([list(e) for e in (l_data.get("embeddings") or [])])
+        _raw_l_embs = l_data.get("embeddings")
+        embs.extend([list(e) for e in _raw_l_embs] if _raw_l_embs is not None else [])
 
     if not embs:
         return {"os": os_name, "clusters": 0, "prototypes": 0}
