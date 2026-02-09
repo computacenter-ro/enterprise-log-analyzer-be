@@ -35,8 +35,7 @@ COPY pyproject.toml poetry.lock* /app/
 # Export and install dependencies into the venv (excluding dev) for portability
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pypoetry \
-    poetry lock --no-update \
-    && poetry export --without dev -f requirements.txt -o requirements.txt \
+    poetry export --without dev -f requirements.txt -o requirements.txt \
     && pip install -r requirements.txt \
     && python -c "import uvicorn, aiofiles"
 
