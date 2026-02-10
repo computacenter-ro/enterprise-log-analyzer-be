@@ -62,6 +62,7 @@ class ChromaClientProvider:
                 model=settings.TEI_MODEL_NAME,
                 api_key=settings.TEI_API_KEY,
                 base_url=f"{tei_base}/v1",
+                input_type=settings.TEI_INPUT_TYPE,
             )
         else:
             raise ValueError(

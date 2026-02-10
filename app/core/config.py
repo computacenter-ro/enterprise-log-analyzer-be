@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     TEI_BASE_URL: str = "http://localhost:8081"  # Base URL of TEI server
     TEI_MODEL_NAME: str = "bert-base-uncased"  # Model name for identification (TEI uses model it was started with)
     TEI_API_KEY: str | None = None  # Optional API key (TEI doesn't require auth by default)
+    TEI_INPUT_TYPE: str | None = None  # Required by some NIM models (e.g. "passage")
     # LLM provider and models (inference/classification)
     LLM_PROVIDER: str = "openai"  # "openai" | "ollama"
     OLLAMA_CHAT_MODEL: str = "mistral"

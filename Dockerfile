@@ -13,7 +13,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-ENV POETRY_VERSION="2.3.2" \
+ENV POETRY_VERSION="1.8.5" \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_CREATE=false \
     PIP_NO_CACHE_DIR=1
@@ -35,7 +35,8 @@ COPY pyproject.toml poetry.lock* /app/
 # Export and install dependencies into the venv (excluding dev) for portability
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pypoetry \
-    poetry export --without dev -f requirements.txt -o requirements.txt \
+    poetry lock --no-update \
+    && poetry export --without dev -f requirements.txt -o requirements.txt \
     && pip install -r requirements.txt \
     && python -c "import uvicorn, aiofiles"
 
@@ -87,8 +88,10 @@ ENV PYTHONPATH="/app:${PYTHONPATH}"
 # Add simulation-api to Python path for producer
 ENV PYTHONPATH="/app/simulation-api:${PYTHONPATH}"
 
-# Copy project source
-COPY --from=builder /app /app
+# Copy only runtime-needed source (excludes poetry cache, pyproject.toml, .git, etc.)
+COPY --from=builder /app/app /app/app
+COPY --from=builder /app/simulation-api /app/simulation-api
+COPY --from=builder /app/data /app/data
 
 # Ensure Chroma persistence directory exists and is writable even for non-root UIDs
 RUN mkdir -p /app/.chroma && chmod 777 /app/.chroma

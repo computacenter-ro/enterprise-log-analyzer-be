@@ -68,6 +68,8 @@ class LogBERTEmbeddingFunction:
             # 'accelerate' from intervening and leaving tensors on the 'meta' device.
             load_kwargs: dict[str, object] = {
                 "trust_remote_code": True,
+                "low_cpu_mem_usage": False,
+                "device_map": None,
             }
 
             self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -270,13 +272,15 @@ class OpenAIEmbeddingFunction:
         model: str,
         api_key: str | None = None,
         base_url: str | None = None,
+        input_type: str | None = None,
     ) -> None:
         """Initialize the OpenAI-compatible embedding function.
-        
+
         Args:
             model: Model name for the embeddings
             api_key: API key (optional for some servers like TEI)
             base_url: Custom base URL for OpenAI-compatible servers (e.g., TEI at http://localhost:8081/v1)
+            input_type: Required by some NIM models (e.g. "passage" or "query")
         """
         # OpenAI Python SDK v1 uses client with api_key from env or provided
         self.client = OpenAI(
@@ -287,13 +291,33 @@ class OpenAIEmbeddingFunction:
         )
         self.model = model
         self._base_url = base_url
+        self._input_type = input_type
 
     def __call__(self, input: Iterable[str]) -> List[List[float]]:
-        inputs = list(input)
-        if not inputs:
+        raw_items = list(input)
+        if not raw_items:
             return []
-        # Batching can be added if needed; for simplicity, do one request
-        response = self.client.embeddings.create(model=self.model, input=inputs)
+        # Coerce to plain strings — Chroma may pass nested lists or non-string types
+        inputs: List[str] = []
+        for value in raw_items:
+            if isinstance(value, str):
+                inputs.append(value)
+            elif isinstance(value, (list, tuple)):
+                try:
+                    inputs.append(" ".join(map(str, value)))
+                except Exception:
+                    inputs.append(str(value))
+            elif value is None:
+                inputs.append("")
+            else:
+                inputs.append(str(value))
+        extra: dict[str, object] = {}
+        if self._input_type:
+            extra["input_type"] = self._input_type
+        kwargs: dict[str, object] = {"model": self.model, "input": inputs}
+        if extra:
+            kwargs["extra_body"] = extra
+        response = self.client.embeddings.create(**kwargs)  # type: ignore[arg-type]
         # Ensure ordering is preserved
         return [emb.embedding for emb in response.data]
 

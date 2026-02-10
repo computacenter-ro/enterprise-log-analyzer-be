@@ -14,15 +14,6 @@ from app.services.failure_rules import match_failure_signals
 
 LOG = logging.getLogger(__name__)
 
-_provider: ChromaClientProvider | None = None
-
-
-def _get_provider() -> ChromaClientProvider:
-    global _provider
-    if _provider is None:
-        _provider = ChromaClientProvider()
-    return _provider
-
 
 def _suffix_for_os(os_name: str) -> str:
     key = (os_name or "").strip().lower()
@@ -229,17 +220,27 @@ def cluster_os(
     min_size: int | None = None,
 ) -> Dict[str, Any]:
     """Cluster templates (and optional sample of logs) to build prototypes for an OS."""
-    provider = _get_provider()
+    provider = ChromaClientProvider()
     threshold = threshold if threshold is not None else settings.CLUSTER_DISTANCE_THRESHOLD
     min_size = min_size if min_size is not None else settings.CLUSTER_MIN_SIZE
 
     # Load templates
     templates = provider.get_or_create_collection(_templates_collection_name(os_name))
     t_data = templates.get(include=["embeddings", "documents", "metadatas"]) or {}
-    t_ids = t_data.get("ids") or []
-    t_docs = t_data.get("documents") or []
-    _raw_t_embs = t_data.get("embeddings")
-    t_embs = _raw_t_embs if _raw_t_embs is not None else []
+    _t_ids = t_data.get("ids")
+    _t_docs = t_data.get("documents")
+    _t_embs = t_data.get("embeddings")
+    try:
+        import numpy as np
+        if isinstance(_t_embs, np.ndarray):
+            _t_embs = _t_embs.tolist()
+        if isinstance(_t_docs, np.ndarray):
+            _t_docs = _t_docs.tolist()
+    except Exception:
+        pass
+    t_ids = list(_t_ids) if _t_ids is not None else []
+    t_docs = list(_t_docs) if _t_docs is not None else []
+    t_embs = _t_embs if _t_embs is not None else []
 
     ids: List[str] = list(t_ids)
     docs: List[str] = list(t_docs)
@@ -249,10 +250,20 @@ def cluster_os(
     if include_logs_samples and include_logs_samples > 0:
         logs = provider.get_or_create_collection(_logs_collection_name(os_name))
         l_data = logs.get(include=["embeddings", "documents", "metadatas"], limit=int(include_logs_samples)) or {}
-        ids.extend(l_data.get("ids") or [])
-        docs.extend(l_data.get("documents") or [])
-        _raw_l_embs = l_data.get("embeddings")
-        embs.extend([list(e) for e in _raw_l_embs] if _raw_l_embs is not None else [])
+        _l_ids = l_data.get("ids")
+        _l_docs = l_data.get("documents")
+        _l_embs = l_data.get("embeddings")
+        try:
+            import numpy as np
+            if isinstance(_l_embs, np.ndarray):
+                _l_embs = _l_embs.tolist()
+            if isinstance(_l_docs, np.ndarray):
+                _l_docs = _l_docs.tolist()
+        except Exception:
+            pass
+        ids.extend(list(_l_ids) if _l_ids is not None else [])
+        docs.extend(list(_l_docs) if _l_docs is not None else [])
+        embs.extend([list(e) for e in _l_embs] if _l_embs else [])
 
     if not embs:
         return {"os": os_name, "clusters": 0, "prototypes": 0}

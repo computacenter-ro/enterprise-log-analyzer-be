@@ -15,15 +15,6 @@ except Exception:  # pragma: no cover
 
 LOG = logging.getLogger(__name__)
 
-_provider: ChromaClientProvider | None = None
-
-
-def _get_provider() -> ChromaClientProvider:
-    global _provider
-    if _provider is None:
-        _provider = ChromaClientProvider()
-    return _provider
-
 
 def _logs_collection_name(os_name: str) -> str:
     key = (os_name or "").strip().lower()
@@ -93,7 +84,7 @@ def compute_global_clusters(
     thr = threshold if threshold is not None else settings.CLUSTER_DISTANCE_THRESHOLD
     ms = min_size if min_size is not None else settings.CLUSTER_MIN_SIZE
 
-    provider = _get_provider()
+    provider = ChromaClientProvider()
 
     ids: List[str] = []
     docs: List[str] = []
@@ -112,11 +103,21 @@ def compute_global_clusters(
         except Exception as exc:
             LOG.info("correlation: failed to read logs for os=%s err=%s", os_name, exc)
             data = {}
-        os_ids: List[str] = list(data.get("ids") or [])
-        os_docs: List[str] = list(data.get("documents") or [])
+        _raw_ids = data.get("ids")
+        _raw_docs = data.get("documents")
         _raw_embs = data.get("embeddings")
-        os_embs: List[List[float]] = [list(e) for e in _raw_embs] if _raw_embs is not None else []
-        os_metas_raw = data.get("metadatas") or []
+        _raw_metas = data.get("metadatas")
+        # Convert numpy arrays to lists to avoid truthiness errors
+        if isinstance(_raw_embs, np.ndarray):
+            _raw_embs = _raw_embs.tolist()
+        if isinstance(_raw_docs, np.ndarray):
+            _raw_docs = _raw_docs.tolist()
+        if isinstance(_raw_metas, np.ndarray):
+            _raw_metas = _raw_metas.tolist()
+        os_ids: List[str] = list(_raw_ids) if _raw_ids is not None else []
+        os_docs: List[str] = list(_raw_docs) if _raw_docs is not None else []
+        os_embs: List[List[float]] = [list(e) for e in _raw_embs] if _raw_embs else []
+        os_metas_raw = _raw_metas if _raw_metas is not None else []
         os_metas: List[Dict[str, Any]] = [dict(m) if m else {} for m in os_metas_raw]
 
         # Group by source and take up to limit_per_source
@@ -247,7 +248,7 @@ def compute_global_prototype_clusters_hdbscan(
     if hdbscan is None:
         raise RuntimeError("HDBSCAN is not installed. Please install the 'hdbscan' package.")
     # Load prototypes from all OS
-    provider = _get_provider()
+    provider = ChromaClientProvider()
     raw_ids: List[str] = []
     raw_docs: List[str] = []
     raw_embs: List[List[float]] = []
@@ -262,8 +263,7 @@ def compute_global_prototype_clusters_hdbscan(
             data = {}
         ids0: List[str] = list(data.get("ids") or [])
         docs0: List[str] = list(data.get("documents") or [])
-        _raw_embs0 = data.get("embeddings")
-        embs0: List[List[float]] = [list(e) for e in _raw_embs0] if _raw_embs0 is not None else []
+        embs0: List[List[float]] = [list(e) for e in (data.get("embeddings") or [])]
         metas_raw = data.get("metadatas") or []
         metas0: List[Dict[str, Any]] = [dict(m) if m else {} for m in metas_raw]
         # Annotate os if missing
