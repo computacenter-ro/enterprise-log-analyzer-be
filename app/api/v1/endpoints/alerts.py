@@ -66,8 +66,9 @@ async def list_alerts(
     except Exception:
         persisted_ids = set()
 
-    # Fetch recent (within TTL) from stream, newest first (bounded)
-    stream_entries = await redis.xrevrange(settings.ALERTS_STREAM, max="+", min=min_id, count=limit)
+    # Fetch recent from stream, newest first (bounded).
+    # Use min_id "-" to include ALL alerts regardless of age.
+    stream_entries = await redis.xrevrange(settings.ALERTS_STREAM, max="+", min="-", count=limit)
 
     seen_ids: set[str] = set()
     out: List[Dict[str, Any]] = []
