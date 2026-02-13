@@ -90,6 +90,7 @@ ENV PYTHONPATH="/app/simulation-api:${PYTHONPATH}"
 
 # Copy only runtime-needed source (excludes poetry cache, pyproject.toml, .git, etc.)
 COPY --from=builder /app/app /app/app
+COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/simulation-api /app/simulation-api
 COPY --from=builder /app/data /app/data
 
